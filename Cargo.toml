@@ -1,0 +1,24 @@
+[package]
+name = "azo"
+version = "0.0.1"
+edition = "2024"
+# rust-version = todo
+description = "Re-implementation of ASIO (Audio Stream Input/Output)"
+readme = "README.md"
+repository = "https://github.com/LastExceed/azo"
+license = "MIT"
+keywords = ["ASIO", "audio", "media", "sound", "steinberg"]
+categories = ["hardware-support", "multimedia", "multimedia::audio"]
+# links = ["kernel32.dll", "ole32.dll"]
+
+[features]
+default = ["spec_omitted"]
+spec_omitted = []
+
+[dependencies]
+bitflags = "2.13.1"
+windows-core = "0.62.2"
+windows-registry = "0.6.1"
+
+[build-dependencies]
+windows-bindgen = "0.66.0"
