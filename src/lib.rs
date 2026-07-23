@@ -266,8 +266,8 @@ impl Driver {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Error {
-    code: ErrorCode,
-    message: String
+    pub code: ErrorCode,
+    pub message: String
 }
 #[expect(clippy::absolute_paths, reason = "name collision")]
 impl std::error::Error for Error {}
