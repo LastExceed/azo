@@ -37,18 +37,7 @@ pub fn discover_drivers() -> WinResult<Vec<DriverMetadata>> {
     .keys()?
     .map(|driver_key_name| {
         let driver_key = software_key.open(&driver_key_name)?;
-
-        let clsid =
-            driver_key
-            .get_string("clsid")?
-            .trim_matches(['{', '}'])
-            .try_into()?;
-        
-        let description =
-            driver_key
-            .get_string("description")?;
-        
-        Ok(DriverMetadata { clsid, description })
+        DriverMetadata::from_registry(&driver_key)
     })
     .collect()
 }
@@ -60,6 +49,20 @@ pub struct DriverMetadata {
 }
 
 impl DriverMetadata {
+    fn from_registry(key: &windows_registry::Key) -> WinResult<Self> {
+        let clsid =
+            key
+            .get_string("clsid")?
+            .trim_matches(['{', '}'])
+            .try_into()?;
+        
+        let description =
+            key
+            .get_string("description")?;
+        
+        Ok(Self { clsid, description })
+    }
+    
     pub fn create_instance(&self) -> WinResult<Driver> {
         Driver::new(&self.clsid)
     }
