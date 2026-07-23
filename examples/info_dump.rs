@@ -5,8 +5,8 @@ fn main() -> Result<(), Box<dyn core::error::Error>> {
 	let driver_metas = azo::discover_drivers()?;
 	for (driver_meta_index, driver_meta) in driver_metas.into_iter().enumerate() {		
 		println!("\n==================== driver #{driver_meta_index} ====================\n");
-		println!("clsid      : {}", driver_meta.clsid);
-		println!("description: {}", driver_meta.description);
+		println!("clsid & iid: {:?}", driver_meta.clsid);
+		println!("description: {}"  , driver_meta.description);
 		println!();
 		
 		let driver = driver_meta.create_instance()?;

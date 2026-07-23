@@ -321,15 +321,20 @@ impl IDriver {
     /// # Safety
     /// COM must be initialized.
     unsafe fn create_instance(guid: *const GUID) -> WinResult<Self> {
-        // In theory, `CoCreateInstance` could instanciate the IDriver interface directly.
-        // However, the windows-rs wrapper of this function acquires the IID from a trait-associated constant,
-        // which is impossible to implement in this case.
         let i_unknown: IUnknown =
             unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER) }?;
+        // Technically, `CoCreateInstance` could instanciate the `IDriver` interface directly.
+        // However, windows-rs binds this function in a way where the IID is acquired from a trait-associated constant,
+        // which is impossible to implement in this case, because bizarrely,
+        // the original `IASIO` is not actually a COM interface at all, as there is no IID assigned to it.
+        // Instead, each driver declares and implements an individual replica interface,
+        // re-using the CLSID of its implementation as the IID for the replica.
+        
+        // That, together with the complete absence of `HRESULT`s in all functions breaking any form of marshalling,
+        // is a horrible abuse of the COM system, and completely defeats the point of using it in the first place.
 
-        // The same limitation also applies to `.cast()`.
-        // Luckily, the underlying `.query()` is public,
-        // which enables the following work-around:
+        // The aforementioned binding limitation also applies to `.cast()`.
+        // Luckily, the underlying `.query()` is public, which enables the following work-around:
         unsafe { cast_decoupled(&i_unknown, guid) }
     }
 }
