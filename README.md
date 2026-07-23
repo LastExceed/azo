@@ -18,16 +18,19 @@ Technically, ASIO is platform agnostic. However, the spec does not define how dr
 
 ### Getting started
 
+from `examples/hello_world.rs`:
 ```rust
-// examples/hello_world.rs
 fn main() {
     let all = azo::discover_drivers().unwrap();
     let driver = all[0].create_instance().unwrap();
-    
+
     driver.init(None).unwrap();
-    
-    println!("name   : {}", driver.name());
-    println!("version: {}", driver.version().0);
+    let rate = driver.get_sample_rate().unwrap();
+
+    println!("current sample rate: {rate}");
 }
 ```
+example output:
+> current sample rate: 44100
+
 More `/examples` are available.
