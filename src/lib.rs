@@ -208,7 +208,7 @@ impl Driver {
         .to_result(info.into(), &self.0)
     }
 
-	pub fn create_buffers<const COUNT: usize>(
+	pub fn create_buffers(
         &self,
         args: &[BufferCreateArgs],
         buffer_size: c_long,
@@ -228,7 +228,7 @@ impl Driver {
             )
             .collect::<Vec<_>>();
         
-        unsafe { self.0.create_buffers(&raw mut infos[0], COUNT as _, buffer_size, callbacks) }
+        unsafe { self.0.create_buffers(&raw mut infos[0], infos.len() as _, buffer_size, callbacks) }
         .to_result((), &self.0)?;
     
         Ok(infos.into_iter().map(|info| info.buffers).collect())
