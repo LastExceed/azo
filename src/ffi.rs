@@ -4,7 +4,6 @@ use std::ffi::*;
 use bitflags::bitflags;
 use crate::windows_bindings::HWND;
 use windows_core::{interface, IUnknown, IUnknown_Vtbl};
-use crate::convert_cstring;
 
 #[interface]
 pub unsafe trait IDriver: IUnknown {
@@ -332,13 +331,6 @@ pub struct ClockSource {
 	pub is_current_source: Bool,
 	
 	pub name: [u8; 32]
-}
-
-impl ClockSource {
-	#[must_use]
-	pub fn name(&self) -> String {
-		convert_cstring(&self.name)
-	}
 }
 
 #[repr(C)]

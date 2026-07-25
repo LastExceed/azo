@@ -370,3 +370,10 @@ impl ErrorCode {
         Err(Error { code: self, message })
     }
 }
+
+impl ClockSource {
+	#[must_use]
+	pub fn name(&self) -> String {
+		convert_cstring(&self.name)
+	}
+}
