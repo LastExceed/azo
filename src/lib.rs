@@ -94,7 +94,7 @@ impl Driver {
     pub fn name(&self) -> String {
         let mut buf = [0_u8; 32];
         unsafe {
-            self.0.get_driver_name(&raw mut buf[0]);
+            self.0.get_driver_name(buf.as_mut_ptr());
         }
         convert_cstring(&buf)
     }
@@ -108,7 +108,7 @@ impl Driver {
     pub fn last_error(&self) -> String {
         let mut buf = [0_u8; 124];
         unsafe {
-            self.0.get_error_message(&raw mut buf[0]);
+            self.0.get_error_message(buf.as_mut_ptr());
         }
         convert_cstring(&buf)
     }
@@ -178,7 +178,7 @@ impl Driver {
         
         let mut all = vec![unsafe { mem::zeroed() }; count as _];
 
-        unsafe { self.0.get_clock_sources(&raw mut all[0], &raw mut count) }
+        unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count) }
         .to_result((), &self.0)?;
         
         Ok(all)
@@ -228,7 +228,7 @@ impl Driver {
             )
             .collect::<Vec<_>>();
         
-        unsafe { self.0.create_buffers(&raw mut infos[0], infos.len() as _, buffer_size, callbacks) }
+        unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks) }
         .to_result((), &self.0)?;
     
         Ok(infos.into_iter().map(|info| info.buffers).collect())
@@ -341,7 +341,7 @@ impl IDriver {
         // Technically, `CoCreateInstance` could instanciate the `IDriver` interface directly.
         // However, windows-rs binds this function in a way where the IID is acquired from a trait-associated constant,
         // which is impossible to implement in this case, because bizarrely,
-        // the original `IASIO` is not actually a COM interface at all, as there is no IID assigned to it.
+        // there is no IID assigned to the original `IASIO`, which means it is not actually a COM interface at all.
         // Instead, each driver declares and implements an individual replica interface,
         // re-using the CLSID of its implementation as the IID for the replica.
         
@@ -362,7 +362,7 @@ impl ErrorCode {
         
         let mut buf = [0_u8; 124];
         unsafe {
-            i_driver.get_error_message((&raw mut buf).cast());
+            i_driver.get_error_message(buf.as_mut_ptr());
         }
         
         let message = convert_cstring(&buf);
