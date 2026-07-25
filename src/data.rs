@@ -49,7 +49,7 @@ pub struct BufferSize {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BufferCreateArgs {
+pub struct ChannelId {
     pub input: bool,
     pub channel: ffi::ChannelIndex
 }

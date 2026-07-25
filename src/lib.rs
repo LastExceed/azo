@@ -212,16 +212,16 @@ impl Driver {
 
 	pub fn create_buffers(
         &self,
-        args: &[BufferCreateArgs],
+        channels: &[ChannelId],
         buffer_size: c_long,
         callbacks: &mut Callbacks
     )
     -> Result<Vec<[*mut c_void; 2]>> 
     {
         let mut infos =
-            args
+            channels
             .iter()
-            .map(|BufferCreateArgs { input, channel }|
+            .map(|ChannelId { input, channel }|
                 BufferInfo {
                     is_input: (*input).into(),
                     channel_num: *channel,
