@@ -212,19 +212,19 @@ impl Driver {
 
 	pub fn create_buffers(
         &self,
-        channels: &[ChannelId],
+        channels: impl IntoIterator<Item=ChannelId>,
         buffer_size: c_long,
         callbacks: &mut Callbacks
     )
-    -> Result<Vec<[*mut c_void; 2]>> 
+    -> Result<Vec<[*mut c_void; 2]>>
     {
         let mut infos =
             channels
-            .iter()
+            .into_iter()
             .map(|ChannelId { input, channel }|
                 BufferInfo {
-                    is_input: (*input).into(),
-                    channel_num: *channel,
+                    is_input: input.into(),
+                    channel_num: channel,
                     buffers: [ptr::null_mut(); 2]
                 }
             )
