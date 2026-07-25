@@ -221,10 +221,10 @@ impl Driver {
         let mut infos =
             channels
             .into_iter()
-            .map(|ChannelId { input, channel }|
+            .map(|ChannelId { input, index }|
                 BufferInfo {
                     is_input: input.into(),
-                    channel_num: channel,
+                    channel_num: index,
                     buffers: [ptr::null_mut(); 2]
                 }
             )
