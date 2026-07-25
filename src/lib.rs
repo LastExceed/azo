@@ -27,7 +27,7 @@ use self::ffi::*;
 use self::utils::*;
 use self::windows_bindings::*;
 
-pub use self::windows_bindings::{HWND, HANDLE};
+pub use self::windows_bindings::{HWND, HANDLE, COINIT, COINIT_APARTMENTTHREADED};
 
 type WinResult<T> = windows_core::Result<T>;
 
