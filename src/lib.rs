@@ -233,7 +233,13 @@ impl Driver {
         unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks) }
         .to_result((), &self.0)?;
     
-        Ok(infos.into_iter().map(|info| info.buffers).collect())
+        let buffers =
+            infos
+            .into_iter()
+            .map(|info| info.buffers)
+            .collect();
+
+        Ok(buffers)
     }
 
 	pub fn dispose_all_buffers(&self) -> Result<()> {
