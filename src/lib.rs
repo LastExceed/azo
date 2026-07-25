@@ -1,3 +1,4 @@
+pub mod data;
 pub mod ffi;
 pub mod future;
 pub mod utils;
@@ -20,6 +21,7 @@ use std::{fmt, mem, ptr};
 use std::fmt::Display;
 use std::ffi::*;
 use windows_core::{GUID, IUnknown};
+use self::data::*;
 use self::future::Future;
 use self::ffi::*;
 use self::utils::*;
@@ -280,57 +282,6 @@ impl Display for Error {
 
 #[expect(clippy::absolute_paths, reason = "name collision")]
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ChannelCounts {
-    pub in_: c_long,
-    pub out: c_long
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Latencies {
-    pub in_: c_long,
-    pub out: c_long
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SamplePosition {
-    pub position: Samples,
-    pub time_stamp: TimeStamp
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ChannelInfoResponse {
-    pub is_active  : bool,
-	pub group      : ChannelGroup,
-	pub sample_type: SampleType,
-	pub name       : String
-}
-
-impl From<ChannelInfo> for ChannelInfoResponse {
-    fn from(value: ChannelInfo) -> Self {
-        Self {
-            is_active  : value.is_active.try_into().unwrap_or(false),
-            group      : value.channel_group,
-            sample_type: value.sample_type,
-            name       : convert_cstring(&value.name)
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct BufferSize {
-    pub min: c_long,
-    pub max: c_long,
-    pub preferred: c_long,
-    pub granularity: c_long,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BufferCreateArgs {
-    pub input: bool,
-    pub channel: ChannelIndex
-}
 
 impl IDriver {
     /// # Safety
