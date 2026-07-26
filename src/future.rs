@@ -1,12 +1,4 @@
-#![expect(clippy::unusual_byte_groupings, reason = "easter eggs")]
-
-use std::ffi::c_long;
-
 use super::ffi::*;
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Selector(pub c_long);
 
 /// <div class="warning">
 /// 
@@ -14,18 +6,18 @@ pub struct Selector(pub c_long);
 /// 
 /// </div>
 pub trait Future {
-	const SELECTOR: Selector;
+	const SELECTOR: FutureSelector;
 	type Param;
 }
 
 macro_rules! Impl {
-	($($name:ident, $value:literal, $param:ty),+) => {
+	($($name:ident, $selector:ident, $param:ty),+) => {
 		$(
 			#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 			pub struct $name;
 			
 			impl Future for $name {
-				const SELECTOR: Selector = Selector($value);
+				const SELECTOR: FutureSelector = FutureSelector::$selector;
 				type Param = $param;
 			}
 		)+
@@ -33,36 +25,34 @@ macro_rules! Impl {
 }
 
 Impl!(
-	EnableTimeCodeRead , 1, (),
-	DisableTimeCodeRead, 2, (),
-	SetInputMonitor    , 3, InputMonitor
+	EnableTimeCodeRead , ENABLE_TIME_CODE_READ , (),
+	DisableTimeCodeRead, DISABLE_TIME_CODE_READ, (),
+	SetInputMonitor    , SET_INPUT_MONITOR     , InputMonitor,
+	
+	CanInputMonitor, CAN_INPUT_MONITOR, (),
+	CanTimeInfo    , CAN_TIME_INFO    , (),
+	CanTimeCode    , CAN_TIME_CODE    , (),
+	
+	SetIoFormat  , SET_IO_FORMAT   , IoFormat,
+	GetIoFormat  , GET_IO_FORMAT   , IoFormat,
+	CanDoIoFormat, CAN_DO_IO_FORMAT, IoFormat,
+	
+	CanReportOverload       , CAN_REPORT_OVERLOAD        , (),
+	GetInternalBufferSamples, GET_INTERNAL_BUFFER_SAMPLES, InternalBufferInfo
 );
 
 #[cfg(feature = "spec_omitted")]
 Impl!(
-	Transport      ,  4, TransportParameters,
-	SetInputGain   ,  5, ChannelControls,
-	GetInputMeter  ,  6, ChannelControls,
-	SetOutputGain  ,  7, ChannelControls,
-	GetOutputMeter ,  8, ChannelControls,
-	CanInputMonitor,  9, (),
-	CanTimeInfo    , 10, (),
-	CanTimeCode    , 11, (),
-	CanTransport   , 12, (),
-	CanInputGain   , 13, (),
-	CanInputMeter  , 14, (),
-	CanOutputGain  , 15, (),
-	CanOutputMeter , 16, (),
-	OptionalOne    , 17, ()
-);
+	Transport      ,  TRANSPORT       , TransportParameters,
+	SetInputGain   ,  SET_INPUT_GAIN  , ChannelControls,
+	GetInputMeter  ,  GET_INPUT_METER , ChannelControls,
+	SetOutputGain  ,  SET_OUTPUT_GAIN , ChannelControls,
+	GetOutputMeter ,  GET_OUTPUT_METER, ChannelControls,
 
-Impl!( // DSD
-	SetIoFormat  , 0x_23_11_1961, IoFormat,
-	GetIoFormat  , 0x_23_11_1983, IoFormat,
-	CanDoIoFormat, 0x_23_11_2004, IoFormat
-);
-
-Impl!( // Drop out detection
-	CanReportOverload       , 0x_24_04_2012, (),
-	GetInternalBufferSamples, 0x_25_04_2012, InternalBufferInfo
+	CanTransport   , CAN_TRANSPORT   , (),
+	CanInputGain   , CAN_INPUT_GAIN  , (),
+	CanInputMeter  , CAN_INPUT_METER , (),
+	CanOutputGain  , CAN_OUTPUT_GAIN , (),
+	CanOutputMeter , CAN_OUTPUT_METER, (),
+	OptionalOne    , OPTIONAL_ONE    , ()
 );

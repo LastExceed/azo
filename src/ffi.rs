@@ -360,10 +360,16 @@ impl FutureSelector {
 	pub const DISABLE_TIME_CODE_READ: Self = Self(2);
 	pub const SET_INPUT_MONITOR     : Self = Self(3);
 	
+	pub const CAN_INPUT_MONITOR: Self = Self( 9);
+	pub const CAN_TIME_INFO    : Self = Self(10);
+	pub const CAN_TIME_CODE    : Self = Self(11);
+	
+	// DSD
 	pub const SET_IO_FORMAT   : Self = Self(0x_23_11_1961);
 	pub const GET_IO_FORMAT   : Self = Self(0x_23_11_1983);
 	pub const CAN_DO_IO_FORMAT: Self = Self(0x_23_11_2004);
 	
+	// Drop out detection
 	pub const CAN_REPORT_OVERLOAD        : Self = Self(0x_24_04_2012);
 	pub const GET_INTERNAL_BUFFER_SAMPLES: Self = Self(0x_25_04_2012);
 }
@@ -375,9 +381,7 @@ impl FutureSelector {
 	pub const GET_INPUT_METER  : Self = Self( 6);
 	pub const SET_OUTPUT_GAIN  : Self = Self( 7);
 	pub const GET_OUTPUT_METER : Self = Self( 8);
-	pub const CAN_INPUT_MONITOR: Self = Self( 9);
-	pub const CAN_TIME_INFO    : Self = Self(10);
-	pub const CAN_TIME_CODE    : Self = Self(11);
+	
 	pub const CAN_TRANSPORT    : Self = Self(12);
 	pub const CAN_INPUT_GAIN   : Self = Self(13);
 	pub const CAN_INPUT_METER  : Self = Self(14);
