@@ -271,8 +271,16 @@ impl Driver {
     }
 	
     /// Tells the driver that the host is done processing output buffers.
-    /// This is not implicitly inferred from the return of [`Callbacks::buffer_switch`] / [`Callbacks::buffer_switch_time_info`]
-    /// because it might have been called by a thread that doesn't allow processing within the callback
+    /// 
+    /// This is *not* implicitly inferred from the return of [`Callbacks::buffer_switch`] / [`Callbacks::buffer_switch_time_info`],
+    /// because it might have been called by a thread that doesn't allow processing within the callback.
+    /// 
+    /// # Caveats
+    /// Devices without hardware DSP and no further internal buffering
+	/// have no use for this signal, so their drivers might not support it,
+    /// and instead return [`ErrorCode::NOT_PRESENT`].
+    /// This is not fatal, it just means that calls to this function can (and should) be skipped.
+    /// Take care not to "error out" unnecessarily in this case.
     pub fn output_ready(&self) -> Result<()> {
         unsafe { self.0.output_ready() }
         .to_result((), &self.0)
