@@ -38,9 +38,7 @@ pub struct DriverVersion(pub c_long);
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]
 pub struct ChannelGroup(pub c_long);
 
-#[repr(transparent)]
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]
-pub struct ChannelIndex(pub c_long);
+pub type ChannelIndex = c_long;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]

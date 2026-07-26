@@ -198,11 +198,11 @@ impl Driver {
         .to_result(sample_pos, &self.0)
     }
 
-	pub fn channel_info(&self, channel: ChannelIndex, input: bool) -> Result<ChannelInfoResponse> {
+	pub fn channel_info(&self, channel_id: ChannelId) -> Result<ChannelInfoResponse> {
         let mut info =
             ChannelInfo {
-                channel,
-                is_input: input.into(),
+                channel: channel_id.index,
+                is_input: channel_id.input.into(),
                 ..unsafe { mem::zeroed() }
             };
 

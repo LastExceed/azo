@@ -1,4 +1,5 @@
 use std::error::Error;
+use azo::data::ChannelId;
 use azo::ffi::*;
 use azo::future::*;
 
@@ -58,7 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		println!("...................................................");
 		
 		for i in 0..channel_counts.in_ {
-			let channel_info = driver.channel_info(ChannelIndex(i), true)?;
+			let channel_info = driver.channel_info(ChannelId { input: true, index: i })?;
 			println!(
 				"out {}\t{}\t{}\t{}\t{}",
 				i,
@@ -70,7 +71,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		}
 		
 		for i in 0..channel_counts.out {
-			let channel_info = driver.channel_info(ChannelIndex(i), false)?;
+			let channel_info = driver.channel_info(ChannelId { input: false, index: i })?;
 			println!(
 				" in {}\t{}\t{}\t{}\t{}",
 				i,
@@ -91,7 +92,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 			println!(
 				"{}\t{}\t{}\t{}\t{}",
 				clock_source.index.0,
-				clock_source.associated_channel.0,
+				clock_source.associated_channel,
 				clock_source.associated_group.0,
 				bool::try_from(clock_source.is_current_source).unwrap(),
 				clock_source.name()            
