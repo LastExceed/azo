@@ -220,7 +220,7 @@ impl Driver {
         &self,
         channels: impl IntoIterator<Item=ChannelId>,
         buffer_size: c_long,
-        callbacks: *mut Callbacks
+        callbacks: *const Callbacks
     )
     -> Result<Vec<[*mut c_void; 2]>>
     {
@@ -236,7 +236,7 @@ impl Driver {
             )
             .collect::<Vec<_>>();
         
-        unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks) }
+        unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) }
         .to_result((), &self.0)?;
     
         let buffers =
