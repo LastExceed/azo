@@ -210,11 +210,17 @@ impl Driver {
         .to_result(info.into(), &self.0)
     }
 
-	pub fn create_buffers(
+    /// # Safety
+    /// * `callbacks` must outlive the created buffers.
+    /// * Derefs of the returned buffer pointers must not.
+    /// # Remarks
+    /// Providing safe abstractions for this function is very difficult to do without getting highly opinionated,
+    /// so it will remain `unsafe` for the time being. (Help wanted!)
+	pub unsafe fn create_buffers(
         &self,
         channels: impl IntoIterator<Item=ChannelId>,
         buffer_size: c_long,
-        callbacks: &mut Callbacks
+        callbacks: *mut Callbacks
     )
     -> Result<Vec<[*mut c_void; 2]>>
     {
