@@ -12,8 +12,8 @@ categories = ["hardware-support", "multimedia", "multimedia::audio"]
 # links = ["kernel32.dll", "ole32.dll"]
 
 [features]
-default = ["spec_omitted"]
-spec_omitted = []
+default = ["undocumented"]
+undocumented = []
 
 [dependencies]
 bitflags = "2.13.1"

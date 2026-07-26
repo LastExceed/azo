@@ -41,7 +41,7 @@ Impl!(
 	GetInternalBufferSamples, GET_INTERNAL_BUFFER_SAMPLES, InternalBufferInfo
 );
 
-#[cfg(feature = "spec_omitted")]
+#[cfg(feature = "undocumented")]
 Impl!(
 	Transport      ,  TRANSPORT       , TransportParameters,
 	SetInputGain   ,  SET_INPUT_GAIN  , ChannelControls,

@@ -277,37 +277,37 @@ impl MessageSelector {
 	/// 
     /// * `value` indicates command count
 	/// * `message` provides the commands
-	#[cfg(feature = "spec_omitted")]
+	#[cfg(feature = "undocumented")]
 	pub const MMC_COMMAND: Self = Self(9);
 
 	/// <div class="warning">OMITTED FROM SPEC</div>
 	/// 
 	/// * Host returns [`Bool`]
-	#[cfg(feature = "spec_omitted")]
+	#[cfg(feature = "undocumented")]
 	pub const SUPPORTS_INPUT_MONITOR: Self = Self(10);
 	
 	/// <div class="warning">OMITTED FROM SPEC</div>
 	/// 
 	/// * Host returns [`Bool`]
-	#[cfg(feature = "spec_omitted")]
+	#[cfg(feature = "undocumented")]
 	pub const SUPPORTS_INPUT_GAIN: Self = Self(11);
 	
 	/// <div class="warning">OMITTED FROM SPEC</div>
 	/// 
 	/// * Host returns [`Bool`]
-	#[cfg(feature = "spec_omitted")]
+	#[cfg(feature = "undocumented")]
 	pub const SUPPORTS_INPUT_METER: Self = Self(12);
 	
 	/// <div class="warning">OMITTED FROM SPEC</div>
 	/// 
 	/// * Host returns [`Bool`]
-	#[cfg(feature = "spec_omitted")]
+	#[cfg(feature = "undocumented")]
 	pub const SUPPORTS_OUTPUT_GAIN: Self = Self(13);
 	
 	/// <div class="warning">OMITTED FROM SPEC</div>
 	/// 
 	/// * Host returns [`Bool`]
-	#[cfg(feature = "spec_omitted")]
+	#[cfg(feature = "undocumented")]
 	pub const SUPPORTS_OUTPUT_METER: Self = Self(14);
 	
 	/// The driver detected an overload
@@ -374,7 +374,7 @@ impl FutureSelector {
 	pub const GET_INTERNAL_BUFFER_SAMPLES: Self = Self(0x_25_04_2012);
 }
 
-#[cfg(feature = "spec_omitted")]
+#[cfg(feature = "undocumented")]
 impl FutureSelector {
 	pub const TRANSPORT        : Self = Self( 4);
 	pub const SET_INPUT_GAIN   : Self = Self( 5);
@@ -408,7 +408,7 @@ pub struct InputMonitor {
 	pub pan: U31
 }
 
-#[cfg(feature = "spec_omitted")]
+#[cfg(feature = "undocumented")]
 #[repr(C)]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct ChannelControls {
@@ -427,7 +427,7 @@ pub struct ChannelControls {
 	pub _placeholder: [c_char; 32]
 }
 
-#[cfg(feature = "spec_omitted")]
+#[cfg(feature = "undocumented")]
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TransportParameters {
