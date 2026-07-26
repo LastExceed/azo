@@ -1,6 +1,6 @@
 [package]
 name = "azo"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2024"
 # rust-version = todo
 description = "Re-implementation of ASIO (Audio Stream Input/Output)"
