@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		let buf_slice = unsafe { slice::from_raw_parts_mut(buf_ptr, buf_len) };
 		let mut cursor = Cursor::new(buf_slice);
 
-		// This deliberately inefficient.
+		// This is deliberately inefficient.
 		// It generates the signal sample by sample, over and over.
 		// In praxis, this could be done much more efficiently by pre-rendering the wave once,
 		// and then copying a slice of that on each buffer swap,
