@@ -1,7 +1,6 @@
 use std::ffi::c_long;
-use crate::ffi;
 use crate::utils::convert_cstring;
-
+use azo_sys as sys;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChannelCounts {
@@ -17,20 +16,20 @@ pub struct Latencies {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SamplePosition {
-    pub position: ffi::Samples,
-    pub time_stamp: ffi::TimeStamp
+    pub position: sys::Samples,
+    pub time_stamp: sys::TimeStamp
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChannelInfoResponse {
     pub is_active  : bool,
-	pub group      : ffi::ChannelGroup,
-	pub sample_type: ffi::SampleType,
+	pub group      : sys::ChannelGroup,
+	pub sample_type: sys::SampleType,
 	pub name       : String
 }
 
-impl From<ffi::ChannelInfo> for ChannelInfoResponse {
-    fn from(value: ffi::ChannelInfo) -> Self {
+impl From<sys::ChannelInfo> for ChannelInfoResponse {
+    fn from(value: sys::ChannelInfo) -> Self {
         Self {
             is_active  : value.is_active.try_into().unwrap_or(false),
             group      : value.channel_group,
@@ -51,5 +50,5 @@ pub struct BufferSize {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChannelId {
     pub input: bool,
-    pub index: ffi::ChannelIndex
+    pub index: sys::ChannelIndex
 }

@@ -1,4 +1,4 @@
-use super::ffi::*;
+use azo_sys::*;
 
 /// <div class="warning">
 /// 

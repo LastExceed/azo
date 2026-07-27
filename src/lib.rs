@@ -1,5 +1,4 @@
 pub mod data;
-pub mod ffi;
 pub mod future;
 pub mod utils;
 #[expect(
@@ -21,13 +20,15 @@ use std::{fmt, mem, ptr};
 use std::fmt::Display;
 use std::ffi::*;
 use windows_core::{GUID, IUnknown};
+use extend::ext;
 use self::data::*;
 use self::future::Future;
-use self::ffi::*;
 use self::utils::*;
 use self::windows_bindings::*;
 
 pub use self::windows_bindings::{HWND, HANDLE, COINIT, COINIT_APARTMENTTHREADED};
+pub use azo_sys as sys;
+use sys::*;
 
 type WinResult<T> = windows_core::Result<T>;
 
@@ -80,7 +81,7 @@ impl Driver {
         let sys_ref = main_window_handle.unwrap_or_default(); 
 
         let success =
-            unsafe { self.0.init(sys_ref) }
+            unsafe { self.0.init(sys_ref.0) }
             .try_into()
             .unwrap_or(false);
         
@@ -303,10 +304,11 @@ impl Display for Error {
 #[expect(clippy::absolute_paths, reason = "name collision")]
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[ext]
 impl IDriver {
     /// # Safety
     /// COM must be initialized.
-    unsafe fn create_instance(guid: *const GUID) -> WinResult<Self> {
+    unsafe fn create_instance(guid: *const GUID) -> WinResult<IDriver> {
         let i_unknown: IUnknown =
             unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER) }?;
         // Technically, `CoCreateInstance` could instanciate the `IDriver` interface directly.
@@ -325,7 +327,8 @@ impl IDriver {
     }
 }
 
-impl ErrorCode {
+#[ext]
+pub impl ErrorCode {
     fn to_result<T>(self, ok_value: T, i_driver: &IDriver) -> Result<T> {
         if matches!(self, Self::OK | Self::SUCCESS) {
             return Ok(ok_value);
@@ -342,9 +345,9 @@ impl ErrorCode {
     }
 }
 
-impl ClockSource {
-	#[must_use]
-	pub fn name(&self) -> String {
+#[ext]
+pub impl ClockSource {
+	fn name(&self) -> String {
 		convert_cstring(&self.name)
 	}
 }

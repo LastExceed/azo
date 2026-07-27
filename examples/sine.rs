@@ -7,7 +7,7 @@ use std::{iter, slice};
 use std::sync::mpsc;
 use std::sync::OnceLock;
 use azo::data::ChannelId;
-use azo::ffi::*;
+use azo::sys::*;
 
 static SENDER: OnceLock<mpsc::SyncSender<c_long>> = OnceLock::new();
 

@@ -1,0 +1,18 @@
+[package]
+name = "azo-sys"
+description = "ffi types for azo"
+publish = true
+version.workspace = true
+edition.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["undocumented"]
+undocumented = []
+
+[dependencies]
+bitflags = "2.13.1"
+windows-core = "0.62.2"

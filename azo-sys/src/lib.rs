@@ -1,13 +1,13 @@
 #![allow(clippy::pub_underscore_fields, reason = "placeholders")]
 #![expect(clippy::transmute_ptr_to_ptr, reason = "occurs in a proc macro (`interface`)")]
+
 use std::ffi::*;
 use bitflags::bitflags;
-use crate::windows_bindings::HWND;
 use windows_core::{interface, IUnknown, IUnknown_Vtbl};
 
 #[interface]
 pub unsafe trait IDriver: IUnknown {
-	pub fn init               (&self, sys_ref: HWND                                                                                      ) -> Bool;
+	pub fn init               (&self, sys_ref: *mut c_void                                                                               ) -> Bool;
 	pub fn get_driver_name    (&self, name: *mut u8                                                                                      ) -> ();
 	pub fn get_driver_version (&self,                                                                                                    ) -> DriverVersion;
 	pub fn get_error_message  (&self, string: *mut u8                                                                                    ) -> ();

@@ -1,7 +1,8 @@
 use std::error::Error;
 use azo::data::ChannelId;
-use azo::ffi::*;
+use azo::sys::*;
 use azo::future::*;
+use azo::ClockSourceExt;
 
 fn main() -> Result<(), Box<dyn Error>> {
 	let driver_metas = azo::discover_drivers()?;

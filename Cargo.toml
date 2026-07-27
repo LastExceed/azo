@@ -1,22 +1,33 @@
-[package]
-name = "azo"
+[workspace]
+resolver = "3"
+
+[workspace.package]
 version = "0.0.4"
 edition = "2024"
-# rust-version = todo
-description = "Re-implementation of ASIO (Audio Stream Input/Output)"
-readme = "README.md"
-repository = "https://github.com/LastExceed/azo"
-license = "MIT"
 keywords = ["ASIO", "audio", "media", "sound", "steinberg"]
 categories = ["hardware-support", "multimedia", "multimedia::audio"]
-# links = ["kernel32.dll", "ole32.dll"]
+license = "MIT"
+repository = "https://github.com/LastExceed/azo"
+
+[package]
+name = "azo"
+description = "Re-implementation of ASIO (Audio Stream Input/Output)"
+readme = "README.md"
+publish = true
+version.workspace = true
+edition.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [features]
 default = ["undocumented"]
 undocumented = []
 
 [dependencies]
-bitflags = "2.13.1"
+azo-sys = { path = "./azo-sys", version = "0.0.4" }
+extend = "1.2.0"
 windows-core = "0.62.2"
 windows-registry = "0.6.1"
 
