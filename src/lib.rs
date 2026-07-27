@@ -68,14 +68,14 @@ impl DriverMetadata {
     
     pub fn create_instance(&self) -> WinResult<Driver> {
         let com = COM::new(COINIT_APARTMENTTHREADED)?;
-        let i_driver = unsafe { IDriver::create_instance(&raw const self.clsid) }?;
+        let interface = unsafe { IIASIORedecl::create_instance(&raw const self.clsid) }?;
 
-        Ok(Driver(i_driver, com))
+        Ok(Driver(interface, com))
     }
 }
 
 #[derive(Debug)]
-pub struct Driver(IDriver, COM);
+pub struct Driver(IIASIORedecl, COM);
 impl Driver {
     pub fn init(&self, main_window_handle: Option<HWND>) -> Result<()> {
         let sys_ref = main_window_handle.unwrap_or_default(); 
@@ -305,38 +305,15 @@ impl Display for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[ext]
-impl IDriver {
-    /// # Safety
-    /// COM must be initialized.
-    unsafe fn create_instance(guid: *const GUID) -> WinResult<IDriver> {
-        let i_unknown: IUnknown =
-            unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER) }?;
-        // Technically, `CoCreateInstance` could instanciate the `IDriver` interface directly.
-        // However, windows-rs binds this function in a way where the IID is acquired from a trait-associated constant,
-        // which is impossible to implement in this case, because bizarrely,
-        // there is no IID assigned to the original `IASIO`, which means it is not actually a COM interface at all.
-        // Instead, each driver declares and implements an individual replica interface,
-        // re-using the CLSID of its implementation as the IID for the replica.
-        
-        // That, together with the complete absence of `HRESULT`s in all functions breaking any form of marshalling,
-        // is a horrible abuse of the COM system, and completely defeats the point of using it in the first place.
-
-        // The aforementioned binding limitation also applies to `.cast()`.
-        // Luckily, the underlying `.query()` is public, which enables the following work-around:
-        unsafe { cast_decoupled(&i_unknown, guid) }
-    }
-}
-
-#[ext]
 pub impl ErrorCode {
-    fn to_result<T>(self, ok_value: T, i_driver: &IDriver) -> Result<T> {
+    fn to_result<T>(self, ok_value: T, interface: &IIASIORedecl) -> Result<T> {
         if matches!(self, Self::OK | Self::SUCCESS) {
             return Ok(ok_value);
         }
         
         let mut buf = [0_u8; 124];
         unsafe {
-            i_driver.get_error_message(buf.as_mut_ptr());
+            interface.get_error_message(buf.as_mut_ptr());
         }
         
         let message = convert_cstring(&buf);

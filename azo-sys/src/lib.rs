@@ -5,8 +5,18 @@ use std::ffi::*;
 use bitflags::bitflags;
 use windows_core::{interface, IUnknown, IUnknown_Vtbl};
 
+/// Bizarrely, there is no IID assigned to the original `IASIO`, which means it is not actually a COM interface at all.
+/// Instead, each driver declares and implements an individual replica interface,
+/// re-using the CLSID of its implementation as the IID for the replica.
+///
+/// That, together with the complete absence of `HRESULT`s in all functions breaking any form of marshalling,
+/// is a horrible abuse of the COM system, and completely defeats the point of using it in the first place.
+/// 
+/// Since each driver's re-declaration is separate, and not publicly documented in most cases, there is no correct name for it,
+/// which is why a descriptive name is used here. To be really pedantic, this would even need to be called `IIIASIORedeclRedecl`,
+/// as it re-declares the already re-decleared interface AGAIN. But pragmatically speaking, the name is already quite noisy as-is.
 #[interface]
-pub unsafe trait IDriver: IUnknown {
+pub unsafe trait IIASIORedecl: IUnknown {
 	pub fn init               (&self, sys_ref: *mut c_void                                                                               ) -> Bool;
 	pub fn get_driver_name    (&self, name: *mut u8                                                                                      ) -> ();
 	pub fn get_driver_version (&self,                                                                                                    ) -> DriverVersion;
@@ -318,7 +328,7 @@ impl MessageSelector {
 #[repr(C)]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct ClockSource {
-    /// For use in [`IDriver::set_clock_source()`]
+    /// For use in [`IIASIORedecl::set_clock_source()`]
     pub index: ClockSourceIndex,
     
 	/// E.g. S/PDIF, AES/EBU
