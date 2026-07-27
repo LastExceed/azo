@@ -19,12 +19,11 @@ mod windows_bindings {
 use std::{fmt, mem, ptr};
 use std::fmt::Display;
 use std::ffi::*;
-use windows_core::{GUID, IUnknown};
+use windows_core::GUID;
 use extend::ext;
 use self::data::*;
 use self::future::Future;
 use self::utils::*;
-use self::windows_bindings::*;
 
 pub use self::windows_bindings::{HWND, HANDLE, COINIT, COINIT_APARTMENTTHREADED};
 pub use azo_sys as sys;
@@ -68,7 +67,7 @@ impl DriverMetadata {
     
     pub fn create_instance(&self) -> WinResult<Driver> {
         let com = COM::new(COINIT_APARTMENTTHREADED)?;
-        let interface = unsafe { IIASIORedecl::create_instance(&raw const self.clsid) }?;
+        let interface = com.create_driver_instance(&raw const self.clsid)?;
 
         Ok(Driver(interface, com))
     }
