@@ -1,6 +1,6 @@
 pub mod data;
 pub mod future;
-pub mod utils;
+mod utils;
 #[expect(
     dead_code,
     non_snake_case,
