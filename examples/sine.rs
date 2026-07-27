@@ -1,5 +1,3 @@
-#![allow(unused_variables, reason = "asdf")]
-
 use std::error::Error;
 use std::f64::consts::TAU;
 use std::ffi::{c_long, c_void};
@@ -117,7 +115,7 @@ static CALLBACKS: Callbacks = Callbacks {
 };
 
 /// for compatibility and simplicity, this example always assumes `direct_process == false`
-unsafe extern "system" fn buffer_switch(buffer_index: c_long, direct_process: Bool) {
+unsafe extern "system" fn buffer_switch(buffer_index: c_long, _direct_process: Bool) {
 	let send_result = SENDER.get().unwrap().try_send(buffer_index);
 	
 	use TrySendError::*;
@@ -133,23 +131,23 @@ unsafe extern "system" fn buffer_switch(buffer_index: c_long, direct_process: Bo
 	}
 }
 
-unsafe extern "system" fn sample_rate_did_change(rate: SampleRate) {
+unsafe extern "system" fn sample_rate_did_change(_rate: SampleRate) {
 	unimplemented!()
 }
 
 unsafe extern "system" fn asio_message(
-	selector: MessageSelector,
-	value   : c_long,
-	message : *const c_void,
-	opt     : *const f64
+	_selector: MessageSelector,
+	_value   : c_long,
+	_message : *const c_void,
+	_opt     : *const f64
 ) -> c_long {
 	Bool::FALSE.0
 }
 
 unsafe extern "system" fn buffer_switch_time_info(
-	params             : *const Time,
-	double_buffer_index: c_long,
-	direct_process     : Bool
+	_params             : *const Time,
+	_double_buffer_index: c_long,
+	_direct_process     : Bool
 ) -> Time {
 	unimplemented!()
 }
