@@ -86,7 +86,7 @@ impl TryFrom<Bool> for bool {
 	}
 }
 
-#[derive(Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UndefinedValueError;
 
 #[repr(transparent)]
