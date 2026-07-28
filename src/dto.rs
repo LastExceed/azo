@@ -1,4 +1,6 @@
 use std::ffi::{CString, c_long};
+use std::num::NonZeroI32;
+use std::range::RangeInclusive;
 use crate::utils::cstring_from_bytes_until_nul;
 use azo_sys as sys;
 
@@ -39,12 +41,26 @@ impl From<sys::ChannelInfo> for ChannelInfoResponse {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BufferSize {
-    pub min: c_long,
-    pub max: c_long,
-    pub preferred: c_long,
-    pub granularity: c_long,
+    pub preferred: i32,
+    pub range: Option<(RangeInclusive<i32>, Granularity)>
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Granularity {
+    FixedStep(NonZeroI32),
+    PowersOf2
+}
+
+impl From<NonZeroI32> for Granularity {
+    fn from(value: NonZeroI32) -> Self {
+        if value.get() == -1 {
+            Self::PowersOf2
+        } else {
+            Self::FixedStep(value)
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

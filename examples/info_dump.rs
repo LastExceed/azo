@@ -29,12 +29,12 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	let buffer_size    = driver.buffer_size()?;
 	let sample_rate    = driver.get_sample_rate()?;
 	
-	println!("driver_name    : {}"           , driver_name.to_string_lossy());
-	println!("driver_version : {}"           , driver_version.0);
-	println!("channels       : {} in, {} out", channel_counts.in_, channel_counts.out);
-	println!("latencies      : {} in, {} out", latencies.in_, latencies.out);
-	println!("buffer_size    : {} ({:?}, {})", buffer_size.preferred, buffer_size.min..=buffer_size.max, buffer_size.granularity);
-	println!("sample_rate    : {sample_rate}");
+	println!("driver_name   : {}"           , driver_name.to_string_lossy());
+	println!("driver_version: {}"           , driver_version.0);
+	println!("channels      : {} in, {} out", channel_counts.in_, channel_counts.out);
+	println!("latencies     : {} in, {} out", latencies.in_, latencies.out);
+	println!("buffer_size   : {} ({:?})"    , buffer_size.preferred, buffer_size.range);
+	println!("sample_rate   : {sample_rate}");
 	println!();
 	
 	let mut io_format_pcm = IoFormat {
