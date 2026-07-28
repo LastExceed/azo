@@ -16,29 +16,25 @@ fn main() {
 		if let Err(error) = dump_info(&driver) {
 			println!("{error} - {:?}", driver.last_error());
 		}
-		
-		println!();
 	}
 }
 
 fn dump_info(driver: &Driver) -> azo::Result<()> {
 	driver.init(None)?;
 		
-	let driver_name     = driver.name();
-	let driver_version  = driver.version();
-	let channel_counts  = driver.channel_counts()?;
-	let latencies       = driver.latencies()?;
-	let buffer_size     = driver.buffer_size()?;
-	let sample_rate     = driver.get_sample_rate()?;
-	let sample_position = driver.sample_position();
+	let driver_name    = driver.name();
+	let driver_version = driver.version();
+	let channel_counts = driver.channel_counts()?;
+	let latencies      = driver.latencies()?;
+	let buffer_size    = driver.buffer_size()?;
+	let sample_rate    = driver.get_sample_rate()?;
 	
-	println!("driver_name    : {driver_name:?}"    );
-	println!("driver_version : {driver_version:?}" );
-	println!("channels       : {channel_counts:?}" );
-	println!("latencies      : {latencies:?}"      );
-	println!("buffer_size    : {buffer_size:?}"    );
-	println!("sample_rate    : {sample_rate}"      );
-	println!("sample_position: {sample_position:?}");
+	println!("driver_name    : {}"           , driver_name.to_string_lossy());
+	println!("driver_version : {}"           , driver_version.0);
+	println!("channels       : {} in, {} out", channel_counts.in_, channel_counts.out);
+	println!("latencies      : {} in, {} out", latencies.in_, latencies.out);
+	println!("buffer_size    : {} ({:?}, {})", buffer_size.preferred, buffer_size.min..=buffer_size.max, buffer_size.granularity);
+	println!("sample_rate    : {sample_rate}");
 	println!();
 	
 	let mut io_format_pcm = IoFormat {
@@ -50,18 +46,18 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 		_placeholder: [0; _]
 	};
 	
-	println!("{:<18}: {}"   , stringify!(EnableTimeCodeRead), driver.future::<EnableTimeCodeRead>(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanInputMonitor   ), driver.future::<CanInputMonitor   >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanTimeInfo       ), driver.future::<CanTimeInfo       >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanTimeCode       ), driver.future::<CanTimeCode       >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanTransport      ), driver.future::<CanTransport      >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanInputGain      ), driver.future::<CanInputGain      >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanInputMeter     ), driver.future::<CanInputMeter     >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanOutputGain     ), driver.future::<CanOutputGain     >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanOutputMeter    ), driver.future::<CanOutputMeter    >(&mut ()           ).is_ok());
-	println!("{:<18}: {}"   , stringify!(CanReportOverload ), driver.future::<CanReportOverload >(&mut ()           ).is_ok());
-	println!("{} PCM : {:?}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_pcm)        );
-	println!("{} DSD : {:?}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_dsd)        );
+	println!("{:<18}: {}" , stringify!(EnableTimeCodeRead), driver.future::<EnableTimeCodeRead>(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanInputMonitor   ), driver.future::<CanInputMonitor   >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanTimeInfo       ), driver.future::<CanTimeInfo       >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanTimeCode       ), driver.future::<CanTimeCode       >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanTransport      ), driver.future::<CanTransport      >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanInputGain      ), driver.future::<CanInputGain      >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanInputMeter     ), driver.future::<CanInputMeter     >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanOutputGain     ), driver.future::<CanOutputGain     >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanOutputMeter    ), driver.future::<CanOutputMeter    >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanReportOverload ), driver.future::<CanReportOverload >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{} PCM : {}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_pcm).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{} DSD : {}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_dsd).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
 	println!();
 	
 	println!("channel\tactive\tgroup\tsmpl_ty\tname");
@@ -92,9 +88,9 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	}
 
 	println!();
+
 	println!("clock\tchannel\tgroup\tcurrent\tname");
 	println!("...................................................");
-	
 	
 	let clock_sources = driver.clock_sources()?;
 	for clock_source in clock_sources {
