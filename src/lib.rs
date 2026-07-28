@@ -167,9 +167,10 @@ impl Driver {
             2.. => {
                 let mut all = vec![unsafe { mem::zeroed() }; count as _];
                 let mut count2 = 0;
-                let code = unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count2) };
+                
+                let code2 = unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count2) };
                 assert_eq!(count, count2, "reported number of clock sources changed ({count} -> {count2})");
-                create_result(all, code)
+                create_result(all, code2)
             }
             neg => panic!("driver reported negative number of clock sources ({neg})")
         }
