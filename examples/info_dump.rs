@@ -1,8 +1,7 @@
-use std::error::Error;
+use std::ffi::CStr;
 use azo::dto::ChannelId;
 use azo::{Driver, sys::*};
 use azo::future::*;
-use azo::ClockSourceExt;
 
 fn main() {
 	let driver_metas = azo::discover_drivers().unwrap();
@@ -15,7 +14,7 @@ fn main() {
 		let driver = driver_meta.create_instance().unwrap();
 
 		if let Err(error) = dump_info(&driver) {
-			println!("{error} - {}", driver.last_error());
+			println!("{error} - {:?}", driver.last_error());
 		}
 		
 		println!();
@@ -33,7 +32,7 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	let sample_rate     = driver.get_sample_rate()?;
 	let sample_position = driver.sample_position();
 	
-	println!("driver_name    : {driver_name}"      );
+	println!("driver_name    : {driver_name:?}"    );
 	println!("driver_version : {driver_version:?}" );
 	println!("channels       : {channel_counts:?}" );
 	println!("latencies      : {latencies:?}"      );
@@ -71,7 +70,7 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	for i in 0..channel_counts.in_ {
 		let channel_info = driver.channel_info(ChannelId { input: true, index: i })?;
 		println!(
-			"out {}\t{}\t{}\t{}\t{}",
+			"out {}\t{}\t{}\t{}\t{:?}",
 			i,
 			bool::try_from(channel_info.is_active).unwrap(),
 			channel_info.group.0,
@@ -83,7 +82,7 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	for i in 0..channel_counts.out {
 		let channel_info = driver.channel_info(ChannelId { input: false, index: i })?;
 		println!(
-			" in {}\t{}\t{}\t{}\t{}",
+			" in {}\t{}\t{}\t{}\t{:?}",
 			i,
 			bool::try_from(channel_info.is_active).unwrap(),
 			channel_info.group.0,
@@ -100,12 +99,12 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	let clock_sources = driver.clock_sources()?;
 	for clock_source in clock_sources {
 		println!(
-			"{}\t{}\t{}\t{}\t{}",
+			"{}\t{}\t{}\t{}\t{:?}",
 			clock_source.index.0,
 			clock_source.associated_channel,
 			clock_source.associated_group.0,
 			bool::try_from(clock_source.is_current_source).unwrap(),
-			clock_source.name()            
+			CStr::from_bytes_until_nul(&clock_source.name).expect("buffer overflow")
 		);
 	}
 	

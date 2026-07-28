@@ -16,7 +16,7 @@ fn main() {
 	let driver = all[3].create_instance().unwrap();
 
 	if let Err(error) = play_sine(&driver) {
-		println!("{error} - {}", driver.last_error());
+		println!("{error} - {:?}", driver.last_error());
 	}
 }
 
@@ -35,9 +35,9 @@ fn play_sine(driver: &azo::Driver) -> azo::Result<()> {
 	let (sample_size, fn_write) = match_sample_type(sample_type);
 	
 	let buf_ptrs =
-		unsafe {
-			driver.create_buffers([channel_id], buffer_size, &raw const CALLBACKS)
-		}?[0];
+		unsafe { driver.create_buffers([channel_id], buffer_size, &raw const CALLBACKS) }?
+		.next()
+		.unwrap();
 	
 	driver.start()?;
 	
