@@ -2,7 +2,7 @@
 resolver = "3"
 
 [workspace.package]
-version = "0.0.5"
+version = "0.0.6"
 edition = "2024"
 keywords = ["ASIO", "audio", "media", "sound", "steinberg"]
 categories = ["hardware-support", "multimedia", "multimedia::audio"]
@@ -26,7 +26,7 @@ default = ["undocumented"]
 undocumented = []
 
 [dependencies]
-azo-sys = { path = "./azo-sys", version = "0.0.5" }
+azo-sys = { path = "./azo-sys", version = "0.0.6" }
 windows-core = "0.62.2"
 windows-registry = "0.6.1"
 
