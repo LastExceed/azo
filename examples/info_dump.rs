@@ -1,5 +1,5 @@
 use std::error::Error;
-use azo::data::ChannelId;
+use azo::dto::ChannelId;
 use azo::{Driver, sys::*};
 use azo::future::*;
 use azo::ClockSourceExt;

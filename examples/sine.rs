@@ -6,7 +6,7 @@ use std::sync::mpsc::TrySendError;
 use std::{iter, slice};
 use std::sync::mpsc;
 use std::sync::OnceLock;
-use azo::data::ChannelId;
+use azo::dto::ChannelId;
 use azo::sys::*;
 
 static SENDER: OnceLock<mpsc::SyncSender<c_long>> = OnceLock::new();

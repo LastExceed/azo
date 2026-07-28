@@ -1,4 +1,4 @@
-pub mod data;
+pub mod dto;
 pub mod future;
 mod utils;
 #[expect(
@@ -21,7 +21,7 @@ use std::{fmt, mem, ptr};
 use std::fmt::Display;
 use std::ffi::*;
 use windows_core::GUID;
-use self::data::*;
+use self::dto::*;
 use self::future::Future;
 use self::utils::*;
 
