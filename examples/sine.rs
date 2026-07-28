@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::f64::consts::TAU;
 use std::ffi::{c_long, c_void};
 use std::io::{self, Cursor, Write};
