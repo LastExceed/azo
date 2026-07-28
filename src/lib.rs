@@ -20,14 +20,13 @@ use std::num::NonZeroI32;
 use std::{fmt, mem, ptr};
 use std::fmt::Display;
 use std::ffi::*;
+use sys::{Bool, ErrorCode, IIASIORedecl};
 use windows_core::GUID;
-use self::dto::*;
 use self::future::Future;
 use self::utils::*;
 
 pub use self::windows_bindings::{HWND, HANDLE, COINIT, COINIT_APARTMENTTHREADED};
 pub use azo_sys as sys;
-use sys::*;
 
 type WinResult<T> = windows_core::Result<T>;
 
@@ -97,7 +96,7 @@ impl Driver {
     }
 
     #[must_use]
-    pub fn version(&self) -> DriverVersion {
+    pub fn version(&self) -> sys::DriverVersion {
         unsafe { self.0.get_driver_version() }
     }
     
@@ -118,42 +117,42 @@ impl Driver {
         create_result((), code)
     }
 
-	pub fn channel_counts(&self) -> Result<ChannelCounts> {
-        let mut counts = ChannelCounts { in_: 0, out: 0 };
+	pub fn channel_counts(&self) -> Result<dto::ChannelCounts> {
+        let mut counts = dto::ChannelCounts { in_: 0, out: 0 };
         let code = unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) };
         create_result(counts, code)
     }
 
-    pub fn latencies(&self) -> Result<Latencies> {
-        let mut latencies = Latencies { in_: 0, out: 0 };
+    pub fn latencies(&self) -> Result<dto::Latencies> {
+        let mut latencies = dto::Latencies { in_: 0, out: 0 };
         let code = unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) };
         create_result(latencies, code)
     }
 
-    pub fn buffer_size(&self) -> Result<BufferSize> {
-        let mut out: BufferSize = unsafe { mem::zeroed() };
+    pub fn buffer_size(&self) -> Result<dto::BufferSize> {
+        let mut out: dto::BufferSize = unsafe { mem::zeroed() };
         let code = unsafe { self.0.get_buffer_size(&raw mut out.min, &raw mut out.max, &raw mut out.preferred, &raw mut out.granularity) };
         create_result(out, code)
     }
 
-	pub fn can_sample_rate(&self, sample_rate: SampleRate) -> Result<()> {
+	pub fn can_sample_rate(&self, sample_rate: sys::SampleRate) -> Result<()> {
         let code = unsafe { self.0.can_sample_rate(sample_rate) };
         create_result((), code)
     }
     
-    pub fn get_sample_rate(&self) -> Result<SampleRate> {
+    pub fn get_sample_rate(&self) -> Result<sys::SampleRate> {
         let mut sample_rate = f64::NAN;
         let code = unsafe { self.0.get_sample_rate(&raw mut sample_rate) };
         create_result(sample_rate, code)
     }
     
-    pub fn set_sample_rate(&self, sample_rate: SampleRate) -> Result<()> {
+    pub fn set_sample_rate(&self, sample_rate: sys::SampleRate) -> Result<()> {
         let code = unsafe { self.0.set_sample_rate(sample_rate) };
         create_result((), code)
     }
     
     #[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
-	pub fn clock_sources(&self) -> Result<Vec<ClockSource>> {
+	pub fn clock_sources(&self) -> Result<Vec<sys::ClockSource>> {
         let mut count = 1;
         let mut first = unsafe { mem::zeroed() };
         
@@ -175,20 +174,20 @@ impl Driver {
         }
     }
 
-	pub fn set_clock_source(&self, clock_source: ClockSourceIndex) -> Result<()> {
+	pub fn set_clock_source(&self, clock_source: sys::ClockSourceIndex) -> Result<()> {
         let code = unsafe { self.0.set_clock_source(clock_source) };
         create_result((), code)
     }
 
-	pub fn sample_position(&self) -> Result<SamplePosition> {
-        let mut sample_pos = SamplePosition { position: 0, time_stamp: 0 };
+	pub fn sample_position(&self) -> Result<dto::SamplePosition> {
+        let mut sample_pos = dto::SamplePosition { position: 0, time_stamp: 0 };
         let code = unsafe { self.0.get_sample_position(&raw mut sample_pos.position, &raw mut sample_pos.time_stamp) };
         create_result(sample_pos, code)
     }
 
-	pub fn channel_info(&self, channel_id: ChannelId) -> Result<ChannelInfoResponse> {
+	pub fn channel_info(&self, channel_id: dto::ChannelId) -> Result<dto::ChannelInfoResponse> {
         let mut info =
-            ChannelInfo {
+            sys::ChannelInfo {
                 channel: channel_id.index,
                 is_input: channel_id.input.into(),
                 ..unsafe { mem::zeroed() }
@@ -205,17 +204,17 @@ impl Driver {
     /// so it will remain `unsafe` for the time being. (Help wanted!)
 	pub unsafe fn create_buffers(
         &self,
-        channels: impl IntoIterator<Item=ChannelId>,
+        channels: impl IntoIterator<Item=dto::ChannelId>,
         buffer_size: c_long,
-        callbacks: *const Callbacks
+        callbacks: *const sys::Callbacks
     )
     -> Result<impl Iterator<Item=[*mut c_void; 2]>>
     {
         let mut infos =
             channels
             .into_iter()
-            .map(|ChannelId { input, index }|
-                BufferInfo {
+            .map(|dto::ChannelId { input, index }|
+                sys::BufferInfo {
                     is_input: input.into(),
                     channel_num: index,
                     buffers: [ptr::null_mut(); 2]
