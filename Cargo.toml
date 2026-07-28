@@ -7,18 +7,19 @@ edition = "2024"
 keywords = ["ASIO", "audio", "media", "sound", "steinberg"]
 categories = ["hardware-support", "multimedia", "multimedia::audio"]
 license = "MIT"
+readme = "README.md"
 repository = "https://github.com/LastExceed/azo"
 
 [package]
 name = "azo"
 description = "Re-implementation of ASIO (Audio Stream Input/Output)"
-readme = "README.md"
 publish = true
 version.workspace = true
 edition.workspace = true
 keywords.workspace = true
 categories.workspace = true
 license.workspace = true
+readme.workspace = true
 repository.workspace = true
 
 [features]
