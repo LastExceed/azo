@@ -210,7 +210,7 @@ impl Driver {
         buffer_size: c_long,
         callbacks: *const Callbacks
     )
-    -> Result<Vec<[*mut c_void; 2]>>
+    -> Result<impl Iterator<Item=[*mut c_void; 2]>>
     {
         let mut infos =
             channels
@@ -225,15 +225,12 @@ impl Driver {
             .collect::<Vec<_>>();
         
         let code = unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) };
-        create_result((), code)?; // error out early to prevent redundant Vec alloc below
-    
         let buffers =
             infos
             .into_iter()
-            .map(|info| info.buffers)
-            .collect();
+            .map(|info| info.buffers);
 
-        Ok(buffers)
+        create_result(buffers, code)
     }
 
 	pub fn dispose_all_buffers(&self) -> Result<()> {
