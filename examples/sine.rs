@@ -11,12 +11,18 @@ use azo::sys::*;
 
 static SENDER: OnceLock<mpsc::SyncSender<c_long>> = OnceLock::new();
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
+	let all = azo::discover_drivers().unwrap();
+	let driver = all[3].create_instance().unwrap();
+
+	if let Err(error) = play_sine(&driver) {
+		println!("{error} - {}", driver.last_error());
+	}
+}
+
+fn play_sine(driver: &azo::Driver) -> azo::Result<()> {
 	let (sender, receiver) = mpsc::sync_channel::<c_long>(2);
 	SENDER.set(sender).unwrap();
-	
-	let all = azo::discover_drivers()?;
-	let driver = all[3].create_instance()?;
 
 	driver.init(None)?;
 	
@@ -49,7 +55,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 		// and then copying a slice of that on each buffer swap,
 		// but the goal here is to simulate some form of realtime processing.
 		for _ in 0..buffer_size {
-			fn_write(sine_wave_generator.next().unwrap(), &mut cursor)?;
+			fn_write(sine_wave_generator.next().unwrap(), &mut cursor).unwrap();
 		}
 
 		// See the doc-comment of this function for context.
