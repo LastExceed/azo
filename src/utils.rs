@@ -13,7 +13,7 @@ pub fn create_result<T>(ok_value: T, code: ErrorCode) -> Result<T> {
     }
 }
 
-/// Somehow [`CString`] has no equivalent of [`CStr::from_bytes_until_nul`] - https://github.com/rust-lang/rust/pull/96186
+/// Somehow [`CString`] has no equivalent of [`CStr::from_bytes_until_nul`] - <https://github.com/rust-lang/rust/pull/96186>
 #[must_use]
 pub fn cstring_from_bytes_until_nul(buffer: &[u8]) -> CString {
     CStr
