@@ -18,7 +18,6 @@ mod windows_bindings {
 
 use std::num::NonZeroI32;
 use std::{fmt, mem, ptr};
-use std::fmt::Display;
 use std::ffi::*;
 use sys::{Bool, ErrorCode, IIASIORedecl};
 use windows_core::GUID;
@@ -270,7 +269,7 @@ impl Driver {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Error(NonZeroI32);
 
 impl Error {
@@ -281,13 +280,20 @@ impl Error {
     }
 }
 
-#[expect(clippy::absolute_paths, reason = "name collision")]
-impl std::error::Error for Error {}
-impl Display for Error {
+impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.code().0.fmt(f) // todo
+        self.code().fmt(f)
     }
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.code().fmt(f)
+    }
+}
+
+#[expect(clippy::absolute_paths, reason = "name collision")]
+impl std::error::Error for Error {}
 
 #[expect(clippy::absolute_paths, reason = "name collision")]
 pub type Result<T> = std::result::Result<T, Error>;

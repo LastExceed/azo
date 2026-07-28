@@ -1,5 +1,9 @@
 #![allow(clippy::pub_underscore_fields, reason = "placeholders")]
 #![expect(clippy::transmute_ptr_to_ptr, reason = "occurs in a proc macro (`interface`)")]
+#![expect(clippy::unusual_byte_groupings, reason = "easter eggs")]
+
+#[macro_use]
+mod utils;
 
 use std::ffi::*;
 use bitflags::bitflags;
@@ -89,61 +93,47 @@ impl TryFrom<Bool> for bool {
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct UndefinedValueError;
 
-#[repr(transparent)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SampleType(pub c_long);
-impl SampleType {
-	pub const PCM_I16_MSB: Self = Self(0);
-	pub const PCM_I24_MSB: Self = Self(1);
-	pub const PCM_I32_MSB: Self = Self(2);
-	pub const PCM_F32_MSB: Self = Self(3);
-	pub const PCM_F64_MSB: Self = Self(4);
-	// 5
-	// 6
-	// 7
-	pub const PCM_I32_MSB_16: Self = Self(8);
-	pub const PCM_I32_MSB_18: Self = Self(9);
-	pub const PCM_I32_MSB_20: Self = Self(10);
-	pub const PCM_I32_MSB_24: Self = Self(11);
-	// 12
-	// 13
-	// 14
-	// 15
-	pub const PCM_I16_LSB: Self = Self(16);
-	pub const PCM_I24_LSB: Self = Self(17);
-	pub const PCM_I32_LSB: Self = Self(18);
-	pub const PCM_F32_LSB: Self = Self(19);
-	pub const PCM_F64_LSB: Self = Self(20);
-	// 21
-	// 22
-	// 23
-	pub const PCM_I32_LSB_16: Self = Self(24);
-	pub const PCM_I32_LSB_18: Self = Self(25);
-	pub const PCM_I32_LSB_20: Self = Self(26);
-	pub const PCM_I32_LSB_24: Self = Self(27);
-	// 28
-	// 29
-	// 30
-	// 31
-	pub const DSD_I8_LSB_1: Self = Self(32);
-	pub const DSD_I8_MSB_1: Self = Self(33);
-	pub const DSD_I8_NER_8: Self = Self(40);
-}
+c_enum!(SampleType,
+	PCM_I16_MSB = 0,
+	PCM_I24_MSB = 1,
+	PCM_I32_MSB = 2,
+	PCM_F32_MSB = 3,
+	PCM_F64_MSB = 4,
+	// 5, 6, 7
+	PCM_I32_MSB_16 = 8,
+	PCM_I32_MSB_18 = 9,
+	PCM_I32_MSB_20 = 10,
+	PCM_I32_MSB_24 = 11,
+	// 12, 13, 14, 15
+	PCM_I16_LSB = 16,
+	PCM_I24_LSB = 17,
+	PCM_I32_LSB = 18,
+	PCM_F32_LSB = 19,
+	PCM_F64_LSB = 20,
+	// 21, 22, 23
+	PCM_I32_LSB_16 = 24,
+	PCM_I32_LSB_18 = 25,
+	PCM_I32_LSB_20 = 26,
+	PCM_I32_LSB_24 = 27,
+	// 28, 29, 30, 31
+	DSD_I8_LSB_1 = 32,
+	DSD_I8_MSB_1 = 33,
+	DSD_I8_NER_8 = 40
+);
 
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ErrorCode(pub c_long);
+c_enum!(ErrorCode,
+	OK                = 0,
+	SUCCESS           = 0x3f4847a0,
+	NOT_PRESENT       = -1000,
+	HW_MALFUNCTION    = -999,
+	INVALID_PARAMETER = -998,
+	INVALID_MODE      = -997,
+	SP_NOT_ADVANCING  = -996,
+	NO_CLOCK          = -995,
+	NO_MEMORY         = -994
+);
+
 impl ErrorCode {
-    pub const OK               : Self = Self(0);
-    pub const SUCCESS          : Self = Self(0x3f4847a0);
-    pub const NOT_PRESENT      : Self = Self(-1000);
-    pub const HW_MALFUNCTION   : Self = Self(-999);
-    pub const INVALID_PARAMETER: Self = Self(-998);
-    pub const INVALID_MODE     : Self = Self(-997);
-    pub const SP_NOT_ADVANCING : Self = Self(-996);
-    pub const NO_CLOCK         : Self = Self(-995);
-    pub const NO_MEMORY        : Self = Self(-994);
-	
 	pub fn ok<T>(self, ok_value: T) -> Result<T, Self>{
         match self {
             Self::OK |
@@ -251,7 +241,7 @@ pub struct Callbacks {
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct MessageSelector(pub c_long);
-
+//todo: c_enum macro (requires doc comment support)
 impl MessageSelector {
 	/// * Host returns [`Bool`] indicating whether the [`MessageSelector`] specified in `value` is supported.
 	pub const SELECTOR_SUPPORTED: Self = Self(1);
@@ -360,29 +350,24 @@ pub struct BufferInfo {
 	pub buffers    : [*mut c_void; 2]
 }
 
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FutureSelector(pub c_long);
+c_enum!(FutureSelector,
+	ENABLE_TIME_CODE_READ  = 1,
+	DISABLE_TIME_CODE_READ = 2,
+	SET_INPUT_MONITOR      = 3,
 
-#[expect(clippy::unusual_byte_groupings, reason = "easter eggs")]
-impl FutureSelector {
-	pub const ENABLE_TIME_CODE_READ : Self = Self(1);
-	pub const DISABLE_TIME_CODE_READ: Self = Self(2);
-	pub const SET_INPUT_MONITOR     : Self = Self(3);
-	
-	pub const CAN_INPUT_MONITOR: Self = Self( 9);
-	pub const CAN_TIME_INFO    : Self = Self(10);
-	pub const CAN_TIME_CODE    : Self = Self(11);
-	
+	CAN_INPUT_MONITOR =  9,
+	CAN_TIME_INFO     = 10,
+	CAN_TIME_CODE     = 11,
+
 	// DSD
-	pub const SET_IO_FORMAT   : Self = Self(0x_23_11_1961);
-	pub const GET_IO_FORMAT   : Self = Self(0x_23_11_1983);
-	pub const CAN_DO_IO_FORMAT: Self = Self(0x_23_11_2004);
-	
+	SET_IO_FORMAT    = 0x_23_11_1961,
+	GET_IO_FORMAT    = 0x_23_11_1983,
+	CAN_DO_IO_FORMAT = 0x_23_11_2004,
+
 	// Drop out detection
-	pub const CAN_REPORT_OVERLOAD        : Self = Self(0x_24_04_2012);
-	pub const GET_INTERNAL_BUFFER_SAMPLES: Self = Self(0x_25_04_2012);
-}
+	CAN_REPORT_OVERLOAD         = 0x_24_04_2012,
+	GET_INTERNAL_BUFFER_SAMPLES = 0x_25_04_2012
+);
 
 #[cfg(feature = "undocumented")]
 impl FutureSelector {
@@ -448,32 +433,25 @@ pub struct TransportParameters {
 	pub _placeholder   : [c_char; 64]
 }
 
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TransportParametersCommand(pub c_long);
+c_enum!(TransportParametersCommand,
+	START       =  1,
+	STOP        =  2,
+	LOCATE      =  3,
+	PUNCH_IN    =  4,
+	PUNCH_OUT   =  5,
+	ARM_ON      =  6,
+	ARM_OFF     =  7,
+	MONITOR_ON  =  8,
+	MONITOR_OFF =  9,
+	ARM         = 10,
+	MONITOR     = 11
+);
 
-impl TransportParametersCommand {
-	pub const START      : Self = Self( 1);
-	pub const STOP       : Self = Self( 2);
-	pub const LOCATE     : Self = Self( 3);
-	pub const PUNCH_IN   : Self = Self( 4);
-	pub const PUNCH_OUT  : Self = Self( 5);
-	pub const ARM_ON     : Self = Self( 6);
-	pub const ARM_OFF    : Self = Self( 7);
-	pub const MONITOR_ON : Self = Self( 8);
-	pub const MONITOR_OFF: Self = Self( 9);
-	pub const ARM        : Self = Self(10);
-	pub const MONITOR    : Self = Self(11);
-}
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct IoFormatType(pub c_long);
-impl IoFormatType {
-	pub const INVALID: Self = Self(-1);
-	pub const PCM    : Self = Self( 0);
-	pub const DSD    : Self = Self( 1);
-}
+c_enum!(IoFormatType,
+	INVALID = -1,
+	PCM     =  0,
+	DSD     =  1
+);
 
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
