@@ -16,6 +16,7 @@ mod windows_bindings {
     include!(concat!(env!("OUT_DIR"), "/windows_bindgen_out.rs"));
 }
 
+use std::num::NonZeroI32;
 use std::{fmt, mem, ptr};
 use std::fmt::Display;
 use std::ffi::*;
@@ -79,25 +80,20 @@ impl Driver {
     pub fn init(&self, main_window_handle: Option<HWND>) -> Result<()> {
         let sys_ref = main_window_handle.unwrap_or_default(); 
 
-        let success =
-            unsafe { self.0.init(sys_ref.0) }
-            .try_into()
-            .unwrap_or(false);
-        
-        if success {
-            Ok(())
-        } else {
-            ErrorCode(-1) // no proper error code available here
-            .to_result((), &self.0)
-        }
+        let code =
+            match unsafe { self.0.init(sys_ref.0) } {
+                Bool::TRUE  => ErrorCode::OK,
+                Bool::FALSE => ErrorCode(-1), // no proper error code available here
+                non_bool    => ErrorCode(non_bool.0) // invalid driver behaviour, but a realistic scenario, and it makes the API more consistent
+            };
+
+        create_result((), code)
     }
     
     #[must_use]
     pub fn name(&self) -> String {
         let mut buf = [0_u8; 32];
-        unsafe {
-            self.0.get_driver_name(buf.as_mut_ptr());
-        }
+        unsafe { self.0.get_driver_name(buf.as_mut_ptr()); }
         convert_cstring(&buf)
     }
 
@@ -109,93 +105,85 @@ impl Driver {
     #[must_use]
     pub fn last_error(&self) -> String {
         let mut buf = [0_u8; 124];
-        unsafe {
-            self.0.get_error_message(buf.as_mut_ptr());
-        }
+        unsafe { self.0.get_error_message(buf.as_mut_ptr()); }
         convert_cstring(&buf)
     }
     
     pub fn start(&self) -> Result<()> {
-        unsafe { self.0.start() }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.start() };
+        create_result((), code)
     }
     
     pub fn stop(&self) -> Result<()> {
-        unsafe { self.0.stop() }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.stop() };
+        create_result((), code)
     }
 
 	pub fn channel_counts(&self) -> Result<ChannelCounts> {
         let mut counts = ChannelCounts { in_: 0, out: 0 };
-        
-        unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) }
-        .to_result(counts, &self.0)
+        let code = unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) };
+        create_result(counts, code)
     }
 
     pub fn latencies(&self) -> Result<Latencies> {
         let mut latencies = Latencies { in_: 0, out: 0 };
-        
-        unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) }
-        .to_result(latencies, &self.0)
+        let code = unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) };
+        create_result(latencies, code)
     }
 
     pub fn buffer_size(&self) -> Result<BufferSize> {
         let mut out: BufferSize = unsafe { mem::zeroed() };
-        
-        unsafe { self.0.get_buffer_size(&raw mut out.min, &raw mut out.max, &raw mut out.preferred, &raw mut out.granularity) }
-        .to_result(out, &self.0)
+        let code = unsafe { self.0.get_buffer_size(&raw mut out.min, &raw mut out.max, &raw mut out.preferred, &raw mut out.granularity) };
+        create_result(out, code)
     }
 
 	pub fn can_sample_rate(&self, sample_rate: SampleRate) -> Result<()> {
-        unsafe { self.0.can_sample_rate(sample_rate) }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.can_sample_rate(sample_rate) };
+        create_result((), code)
     }
     
     pub fn get_sample_rate(&self) -> Result<SampleRate> {
         let mut sample_rate = f64::NAN;
-
-        unsafe { self.0.get_sample_rate(&raw mut sample_rate) }
-        .to_result(sample_rate, &self.0)
+        let code = unsafe { self.0.get_sample_rate(&raw mut sample_rate) };
+        create_result(sample_rate, code)
     }
     
     pub fn set_sample_rate(&self, sample_rate: SampleRate) -> Result<()> {
-        unsafe { self.0.set_sample_rate(sample_rate) }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.set_sample_rate(sample_rate) };
+        create_result((), code)
     }
     
+    #[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
 	pub fn clock_sources(&self) -> Result<Vec<ClockSource>> {
         let mut count = 1;
         let mut first = unsafe { mem::zeroed() };
         
-        unsafe { self.0.get_clock_sources(&raw mut first, &raw mut count) }
-        .to_result((), &self.0)?;
+        let code = unsafe { self.0.get_clock_sources(&raw mut first, &raw mut count) };
+        create_result((), code)?;
     
-        if count < 1 {
-            return Ok(vec![]);
+        match count {
+            0   => Ok(Vec::new()),
+            1   => Ok([first].into()),
+            2.. => {
+                let mut all = vec![unsafe { mem::zeroed() }; count as _];
+                let mut count2 = 0;
+                let code = unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count2) };
+                assert_eq!(count, count2, "reported number of clock sources changed ({count} -> {count2})");
+                create_result(all, code)
+            }
+            neg => panic!("driver reported negative number of clock sources ({neg})")
         }
-    
-        if count == 1 {
-            return Ok(vec![first]);
-        }
-        
-        let mut all = vec![unsafe { mem::zeroed() }; count as _];
-
-        unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count) }
-        .to_result((), &self.0)?;
-        
-        Ok(all)
     }
 
 	pub fn set_clock_source(&self, clock_source: ClockSourceIndex) -> Result<()> {
-        unsafe { self.0.set_clock_source(clock_source) }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.set_clock_source(clock_source) };
+        create_result((), code)
     }
 
 	pub fn sample_position(&self) -> Result<SamplePosition> {
         let mut sample_pos = SamplePosition { position: 0, time_stamp: 0 };
-        
-        unsafe { self.0.get_sample_position(&raw mut sample_pos.position, &raw mut sample_pos.time_stamp) }
-        .to_result(sample_pos, &self.0)
+        let code = unsafe { self.0.get_sample_position(&raw mut sample_pos.position, &raw mut sample_pos.time_stamp) };
+        create_result(sample_pos, code)
     }
 
 	pub fn channel_info(&self, channel_id: ChannelId) -> Result<ChannelInfoResponse> {
@@ -205,9 +193,8 @@ impl Driver {
                 is_input: channel_id.input.into(),
                 ..unsafe { mem::zeroed() }
             };
-
-        unsafe { self.0.get_channel_info(&raw mut info) }
-        .to_result(info.into(), &self.0)
+        let code = unsafe { self.0.get_channel_info(&raw mut info) };
+        create_result(info.into(), code)
     }
 
     /// # Safety
@@ -236,8 +223,8 @@ impl Driver {
             )
             .collect::<Vec<_>>();
         
-        unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) }
-        .to_result((), &self.0)?;
+        let code = unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) };
+        create_result((), code)?; // error out early to prevent redundant Vec alloc below
     
         let buffers =
             infos
@@ -249,14 +236,14 @@ impl Driver {
     }
 
 	pub fn dispose_all_buffers(&self) -> Result<()> {
-        unsafe { self.0.dispose_buffers() }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.dispose_buffers() };
+        create_result((), code)
     }
 
     /// Tells the driver to open its GUI
     pub fn open_control_panel(&self) -> Result<()> {
-        unsafe { self.0.control_panel() }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.control_panel() };
+        create_result((), code)
     }
 
     /// A very unfortunate name. 
@@ -266,8 +253,8 @@ impl Driver {
         let selector = T::SELECTOR.0;
         let opt = ptr::from_mut(param).cast();
         
-        unsafe { self.0.future(selector, opt) }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.future(selector, opt) };
+        create_result((), code)
     }
 	
     /// Tells the driver that the host is done processing output buffers.
@@ -282,44 +269,32 @@ impl Driver {
     /// This is not fatal, it just means that calls to this function can (and should) be skipped.
     /// Take care not to "error out" unnecessarily in this case.
     pub fn output_ready(&self) -> Result<()> {
-        unsafe { self.0.output_ready() }
-        .to_result((), &self.0)
+        let code = unsafe { self.0.output_ready() };
+        create_result((), code)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Error {
-    pub code: ErrorCode,
-    pub message: String
+pub struct Error(NonZeroI32);
+
+impl Error {
+    /// guaranteed to never be [`ErrorCode::OK`] / [`ErrorCode::SUCCESS`]
+    #[must_use]
+    pub const fn code(&self) -> ErrorCode {
+        ErrorCode(self.0.get())
+    }
 }
+
 #[expect(clippy::absolute_paths, reason = "name collision")]
 impl std::error::Error for Error {}
 impl Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[{}] {}", self.code.0, self.message)
+        self.code().0.fmt(f) // todo
     }
 }
 
 #[expect(clippy::absolute_paths, reason = "name collision")]
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[ext]
-pub impl ErrorCode {
-    fn to_result<T>(self, ok_value: T, interface: &IIASIORedecl) -> Result<T> {
-        if matches!(self, Self::OK | Self::SUCCESS) {
-            return Ok(ok_value);
-        }
-        
-        let mut buf = [0_u8; 124];
-        unsafe {
-            interface.get_error_message(buf.as_mut_ptr());
-        }
-        
-        let message = convert_cstring(&buf);
-        
-        Err(Error { code: self, message })
-    }
-}
 
 #[ext]
 pub impl ClockSource {

@@ -1,7 +1,17 @@
 use std::ffi::*;
-use azo_sys::IIASIORedecl;
-use windows_core::{GUID, IUnknown, Interface};
+use windows_core::{IUnknown, Interface};
 use crate::windows_bindings::*;
+use super::*;
+
+/// Can't use [`From`] / [`Into`] because of the orphan rule
+pub fn create_result<T>(ok_value: T, code: ErrorCode) -> Result<T> {
+    match code {
+        ErrorCode::OK |
+        ErrorCode::SUCCESS => Ok(ok_value),
+        
+        bad_code => Err(Error(unsafe { NonZeroI32::new_unchecked(bad_code.0) }))
+    }
+}
 
 #[must_use]
 pub fn convert_cstring(buffer: &[u8]) -> String {
@@ -23,7 +33,7 @@ impl COM {
 	}
 
     #[expect(clippy::unused_self, reason = "required as a guarantee that COM is initialized")]
-    pub fn create_driver_instance(&self, guid: *const GUID) -> super::WinResult<IIASIORedecl> {
+    pub fn create_driver_instance(&self, guid: *const GUID) -> WinResult<IIASIORedecl> {
         // windows-rs binds this function in a way where the IID is acquired from a trait-associated constant,
         // which is impossible to implement in this case (see doc comment of `IIASIORedecl`)
         let i_unknown: IUnknown =
