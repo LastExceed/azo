@@ -12,9 +12,9 @@ use windows_core::{interface, IUnknown, IUnknown_Vtbl};
 /// That, together with the complete absence of `HRESULT`s in all functions breaking any form of marshalling,
 /// is a horrible abuse of the COM system, and completely defeats the point of using it in the first place.
 /// 
-/// Since each driver's re-declaration is separate, and not publicly documented in most cases, there is no correct name for it,
-/// which is why a descriptive name is used here. To be really pedantic, this would even need to be called `IIIASIORedeclRedecl`,
-/// as it re-declares the already re-decleared interface AGAIN. But pragmatically speaking, the name is already quite noisy as-is.
+/// Since each driver's re-declaration is distinct, and the naming up to the respective developers, there is no correct answer to what the name of [`Self`] should be,
+/// so a descriptive name is used here. To be really pedantic, this technically would even need to be called `IIIASIORedeclRedecl`,
+/// as it re-declares the already re-decleared interface AGAIN. But that name would be excessively noisy, and probably cause more confusion than clarity.
 #[interface]
 pub unsafe trait IIASIORedecl: IUnknown {
 	pub fn init               (&self, sys_ref: *mut c_void                                                                               ) -> Bool;
