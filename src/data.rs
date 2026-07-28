@@ -1,5 +1,5 @@
-use std::ffi::c_long;
-use crate::utils::convert_cstring;
+use std::ffi::{CString, c_long};
+use crate::utils::cstring_from_bytes_until_nul;
 use azo_sys as sys;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -25,7 +25,7 @@ pub struct ChannelInfoResponse {
     pub is_active  : bool,
 	pub group      : sys::ChannelGroup,
 	pub sample_type: sys::SampleType,
-	pub name       : String
+	pub name       : CString
 }
 
 impl From<sys::ChannelInfo> for ChannelInfoResponse {
@@ -34,7 +34,7 @@ impl From<sys::ChannelInfo> for ChannelInfoResponse {
             is_active  : value.is_active.try_into().unwrap_or(false),
             group      : value.channel_group,
             sample_type: value.sample_type,
-            name       : convert_cstring(&value.name)
+            name       : cstring_from_bytes_until_nul(&value.name)
         }
     }
 }

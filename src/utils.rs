@@ -13,13 +13,13 @@ pub fn create_result<T>(ok_value: T, code: ErrorCode) -> Result<T> {
     }
 }
 
+/// Somehow [`CString`] has no equivalent of [`CStr::from_bytes_until_nul`] - https://github.com/rust-lang/rust/pull/96186
 #[must_use]
-pub fn convert_cstring(buffer: &[u8]) -> String {
+pub fn cstring_from_bytes_until_nul(buffer: &[u8]) -> CString {
     CStr
     ::from_bytes_until_nul(buffer)
     .expect("buffer overflow")
-    .to_string_lossy()
-    .into_owned()
+    .to_owned()
 }
 
 /// This ZST ensures correct pairing of calls to [`CoInitializeEx`] and [`CoUninitialize`]

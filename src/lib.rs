@@ -21,7 +21,6 @@ use std::{fmt, mem, ptr};
 use std::fmt::Display;
 use std::ffi::*;
 use windows_core::GUID;
-use extend::ext;
 use self::data::*;
 use self::future::Future;
 use self::utils::*;
@@ -91,10 +90,10 @@ impl Driver {
     }
     
     #[must_use]
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> CString {
         let mut buf = [0_u8; 32];
         unsafe { self.0.get_driver_name(buf.as_mut_ptr()); }
-        convert_cstring(&buf)
+        cstring_from_bytes_until_nul(&buf)
     }
 
     #[must_use]
@@ -103,10 +102,10 @@ impl Driver {
     }
     
     #[must_use]
-    pub fn last_error(&self) -> String {
+    pub fn last_error(&self) -> CString {
         let mut buf = [0_u8; 124];
         unsafe { self.0.get_error_message(buf.as_mut_ptr()); }
-        convert_cstring(&buf)
+        cstring_from_bytes_until_nul(&buf)
     }
     
     pub fn start(&self) -> Result<()> {
@@ -293,10 +292,3 @@ impl Display for Error {
 
 #[expect(clippy::absolute_paths, reason = "name collision")]
 pub type Result<T> = std::result::Result<T, Error>;
-
-#[ext]
-pub impl ClockSource {
-	fn name(&self) -> String {
-		convert_cstring(&self.name)
-	}
-}
