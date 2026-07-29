@@ -42,7 +42,7 @@ pub fn discover_drivers() -> WinResult<Vec<DriverMetadata>> {
     .collect()
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DriverMetadata {
     pub clsid: GUID,
     pub description: HSTRING,
