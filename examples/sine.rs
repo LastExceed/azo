@@ -12,7 +12,7 @@ static SENDER: OnceLock<mpsc::SyncSender<c_long>> = OnceLock::new();
 
 fn main() {
 	let all = azo::discover_drivers().unwrap();
-	let driver = all[3].create_instance().unwrap();
+	let driver = all[0].create_instance().unwrap();
 
 	if let Err(error) = play_sine(&driver) {
 		println!("{error} - {:?}", driver.last_error());
@@ -23,7 +23,7 @@ fn play_sine(driver: &azo::Driver) -> azo::Result<()> {
 	let (sender, receiver) = mpsc::sync_channel::<c_long>(2);
 	SENDER.set(sender).unwrap();
 
-	driver.init(None)?;
+	assert!(driver.init(None), "driver failed to initialize");
 	
 	let channel_id = ChannelId { input: false, index: 0 }; // first output channel
 	

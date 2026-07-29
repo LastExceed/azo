@@ -74,17 +74,13 @@ impl DriverMetadata {
 #[derive(Debug)]
 pub struct Driver(IIASIORedecl, COM);
 impl Driver {
-    pub fn init(&self, main_window_handle: Option<HWND>) -> Result<()> {
+    #[must_use]
+    pub fn init(&self, main_window_handle: Option<HWND>) -> bool {
         let sys_ref = main_window_handle.unwrap_or_default(); 
 
-        let code =
-            match unsafe { self.0.init(sys_ref.0) } {
-                Bool::TRUE  => ErrorCode::OK,
-                Bool::FALSE => ErrorCode(-1), // no proper error code available here
-                non_bool    => ErrorCode(non_bool.0) // invalid driver behaviour, but a realistic scenario, and it makes the API more consistent
-            };
-
-        create_result((), code)
+        unsafe { self.0.init(sys_ref.0) }
+        .try_into()
+        .unwrap_or(false)
     }
     
     #[must_use]

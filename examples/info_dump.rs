@@ -20,8 +20,10 @@ fn main() {
 }
 
 fn dump_info(driver: &Driver) -> azo::Result<()> {
-	driver.init(None)?;
-		
+	if !driver.init(None) {
+		println!("init failed - {:?}", driver.last_error());
+	}
+
 	let driver_name    = driver.name();
 	let driver_version = driver.version();
 	let channel_counts = driver.channel_counts()?;
