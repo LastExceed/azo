@@ -19,8 +19,8 @@ mod windows_bindings {
 use std::num::NonZeroI32;
 use std::{fmt, mem, ptr};
 use std::ffi::*;
-use sys::{Bool, ErrorCode, IIASIORedecl};
-use windows_core::GUID;
+use sys::{ErrorCode, IIASIORedecl};
+use windows_core::{GUID, HSTRING};
 use self::future::Future;
 use self::utils::*;
 
@@ -45,7 +45,7 @@ pub fn discover_drivers() -> WinResult<Vec<DriverMetadata>> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DriverMetadata {
     pub clsid: GUID,
-    pub description: String,
+    pub description: HSTRING,
 }
 
 impl DriverMetadata {
@@ -58,7 +58,7 @@ impl DriverMetadata {
         
         let description =
             key
-            .get_string("description")?;
+            .get_hstring("description")?;
         
         Ok(Self { clsid, description })
     }
