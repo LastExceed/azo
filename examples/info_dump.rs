@@ -1,5 +1,5 @@
 use std::ffi::CStr;
-use azo::dto::ChannelId;
+use azo::dto::{ChannelId, Latencies};
 use azo::{Driver, sys::*};
 use azo::future::*;
 
@@ -27,7 +27,7 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	let driver_name    = driver.name();
 	let driver_version = driver.version();
 	let channel_counts = driver.channel_counts()?;
-	let latencies      = driver.latencies()?;
+	let latencies      = driver.latencies().unwrap_or(Latencies { in_: -1, out: -1 }); // not all drivers support this as it is not strictly necessary for basic usage
 	let buffer_size    = driver.buffer_size()?;
 	let sample_rate    = driver.get_sample_rate()?;
 	
