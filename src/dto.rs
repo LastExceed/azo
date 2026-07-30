@@ -41,24 +41,35 @@ impl From<sys::ChannelInfo> for ChannelInfoResponse {
     }
 }
 
+/// Technically, [`Self::min`] and [`Self::max`] should be guarded by the same [`Option`] as [`Self::granularity`],
+/// as the spec states that `min == max` requires `granularity == 0`.
+/// Practically however:
+/// 1. Even Steinberg's own "built-in" driver violates this requirement, which sets a problematic precedent
+/// 2. The spec unfortunately fails to state the inverse, which technically allows `granularity == 0`
+///    as an alternative expression of `granularity == max - min`, when `min != max`.
+///    (This would translate to "only the minimum and maximum exactly are supported")
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BufferSize {
+    pub min: i32,
+    pub max: i32,
     pub preferred: i32,
-    pub range: Option<(RangeInclusive<i32>, Granularity)>
+    pub granularity: Option<Granularity>
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Granularity {
-    FixedStep(NonZeroI32),
-    PowersOf2
+    /// Supported buffer sizes increase in linear steps (`range.start` + n * `step`)
+    Linear { step: NonZeroI32 },
+    /// Supported buffer sizes increase in powers of 2 (min * 2^n)
+    Exponential
 }
 
 impl From<NonZeroI32> for Granularity {
-    fn from(value: NonZeroI32) -> Self {
-        if value.get() == -1 {
-            Self::PowersOf2
+    fn from(step: NonZeroI32) -> Self {
+        if step.get() == -1 {
+            Self::Exponential
         } else {
-            Self::FixedStep(value)
+            Self::Linear { step }
         }
     }
 }

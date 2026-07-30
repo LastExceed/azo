@@ -21,6 +21,7 @@ use std::{fmt, mem, ptr};
 use std::ffi::*;
 use sys::{ErrorCode, IIASIORedecl};
 use windows_core::{GUID, HSTRING};
+use self::dto::Granularity;
 use self::future::Future;
 use self::utils::*;
 
@@ -126,25 +127,22 @@ impl Driver {
         create_result(latencies, code)
     }
 
-    #[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
     pub fn buffer_size(&self) -> Result<dto::BufferSize> {
-        use core::range::*; // new range types from Rust 1.96
-        let mut range = RangeInclusive::from(-2..=-1); // this `.into()` will become obsolete when the new range types become the default in Rust 2027 edition
+        let mut min         = -1;
+        let mut max         = -2;
         let mut preferred   = -3;
         let mut granularity = -4;
-        let code = unsafe { self.0.get_buffer_size(&raw mut range.start, &raw mut range.last, &raw mut preferred, &raw mut granularity) };
+        let code = unsafe { self.0.get_buffer_size(&raw mut min, &raw mut max, &raw mut preferred, &raw mut granularity) };
         create_result((), code)?;
+        
+        // note the doc-comment on `BufferSize`
 
-        let has_fixed_size = range.start == range.last;
-        let maybe_non_zero = NonZeroI32::new(granularity);
-        
-        assert_eq!(has_fixed_size, maybe_non_zero.is_none(), "invalid driver behaviour: granularity {granularity} is not compatible with range {range:?}");
-        assert!(range.contains(&preferred), "invalid driver behaviour: preferred buffer size {preferred} is not within supported range {range:?}");
-        
         let buffer_size =
             dto::BufferSize {
+                min,
+                max,
                 preferred,
-                range: maybe_non_zero.map(|non_zero| (range, non_zero.into()))
+                granularity: NonZeroI32::new(granularity).map(Granularity::from)
             };
 
         Ok(buffer_size)
