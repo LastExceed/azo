@@ -29,8 +29,10 @@ pub use azo_sys as sys;
 
 type WinResult<T> = windows_core::Result<T>;
 
-/// Enumerates all available ASIO drivers
-pub fn discover_drivers() -> WinResult<Vec<DriverMetadata>> {
+/// Gathers the metadata of all ASIO drivers currently registered in the system.
+/// 
+/// This is the "starting point" of this library.
+pub fn get_drivers() -> WinResult<Vec<DriverMetadata>> {
     let software_key = windows_registry::LOCAL_MACHINE.open("SOFTWARE\\ASIO")?;
         
     software_key

@@ -11,7 +11,7 @@ use azo::sys::*;
 static SENDER: OnceLock<mpsc::SyncSender<c_long>> = OnceLock::new();
 
 fn main() {
-	let all = azo::discover_drivers().unwrap();
+	let all = azo::get_drivers().unwrap();
 	let driver = all[0].create_instance().unwrap();
 
 	if let Err(error) = play_sine(&driver) {
