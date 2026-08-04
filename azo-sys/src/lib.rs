@@ -201,40 +201,44 @@ pub struct Time {
     pub time_code: TimeCode,
 }
 
+/// * `double_buffer_index` points to the half that host should read/write.
+/// * `direct_process` indicates whether or not it is safe to do processing on the calling thread.
+pub type BufferSwitch =
+	unsafe extern "system" fn(
+		double_buffer_index: c_long, 
+		direct_process     : Bool
+	);
+	
+/// 0 = unknown (e.g. in case of clock loss)
+pub type SampleRateDidChange =
+	unsafe extern "system" fn(
+		sample_rate: SampleRate
+	);
+
+/// See the constants on [`MessageSelector`] for info on params and returns.
+pub type AsioMessage =
+	unsafe extern "system" fn(
+		selector: MessageSelector,
+		value   : c_long,
+		message : *const c_void,
+		opt     : *const f64
+	) -> c_long;
+	
+/// Similar to [`BufferSwitch`], but with additional timing info.
+pub type BufferSwitchTimeInfo =
+	unsafe extern "system" fn(
+		params             : *const Time,
+		double_buffer_index: c_long,
+		direct_process     : Bool
+	) -> Time;
 
 #[repr(C)]
 #[derive(Debug, Clone, Hash)]
 pub struct Callbacks {
-	/// * `double_buffer_index` points to the half that host should read/write.
-	/// * `direct_process` indicates whether or not it is safe to do processing on the calling thread.
-    pub buffer_switch:
-		unsafe extern "system" fn(
-			double_buffer_index: c_long, 
-			direct_process     : Bool
-		),
-    
-    /// 0 = unknown (e.g. in case of clock loss)
-    pub sample_rate_did_change:
-		unsafe extern "system" fn(
-			sample_rate: SampleRate
-		),
-
-	/// See the constants on [`MessageSelector`] for info on params and returns.
-    pub asio_message:
-		unsafe extern "system" fn(
-			selector: MessageSelector,
-			value   : c_long,
-			message : *const c_void,
-			opt     : *const f64
-		) -> c_long,
-
-	/// Similar to [`Self::buffer_switch`], but with additional timing info.
-    pub buffer_switch_time_info:
-		unsafe extern "system" fn(
-			params             : *const Time,
-			double_buffer_index: c_long,
-			direct_process     : Bool
-		) -> Time
+    pub buffer_switch: BufferSwitch,
+    pub sample_rate_did_change: SampleRateDidChange,
+    pub asio_message: AsioMessage,
+    pub buffer_switch_time_info: BufferSwitchTimeInfo
 }
 
 /// Used for driver-to-host messages via [`Callbacks::asio_message`]
