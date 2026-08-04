@@ -1,6 +1,5 @@
 use std::ffi::{CString, c_long};
 use std::num::NonZeroI32;
-use std::range::RangeInclusive;
 use crate::utils::cstring_from_bytes_until_nul;
 use azo_sys as sys;
 
