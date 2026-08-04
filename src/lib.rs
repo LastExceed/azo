@@ -283,7 +283,7 @@ impl Driver {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Error(NonZeroI32);
 
 impl Error {
