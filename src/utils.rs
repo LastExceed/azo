@@ -4,10 +4,10 @@ use crate::windows_bindings::*;
 use super::*;
 
 /// Can't use [`From`] / [`Into`] because of the orphan rule
-pub fn create_result<T>(ok_value: T, code: ErrorCode) -> Result<T> {
+pub fn create_result<T>(ok_value: T, code: ResultCode) -> Result<T> {
     match code {
-        ErrorCode::OK |
-        ErrorCode::SUCCESS => Ok(ok_value),
+        ResultCode::OK |
+        ResultCode::SUCCESS => Ok(ok_value),
         
         bad_code => Err(Error(unsafe { NonZeroI32::new_unchecked(bad_code.0) }))
     }

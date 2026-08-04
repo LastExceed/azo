@@ -19,7 +19,7 @@ mod windows_bindings {
 use std::num::NonZeroI32;
 use std::{fmt, mem, ptr};
 use std::ffi::*;
-use sys::{ErrorCode, IIASIORedecl};
+use sys::{ResultCode, IIASIORedecl};
 use windows_core::{GUID, HSTRING};
 use self::dto::Granularity;
 use self::future::Future;
@@ -274,7 +274,7 @@ impl Driver {
     /// # Caveats
     /// Devices without hardware DSP and no further internal buffering
 	/// have no use for this signal, so their drivers might not support it,
-    /// and instead return [`ErrorCode::NOT_PRESENT`].
+    /// and instead return [`ResultCode::NOT_PRESENT`].
     /// This is not fatal, it just means that calls to this function can (and should) be skipped.
     /// Take care not to "error out" unnecessarily in this case.
     pub fn output_ready(&self) -> Result<()> {
@@ -287,10 +287,10 @@ impl Driver {
 pub struct Error(NonZeroI32);
 
 impl Error {
-    /// guaranteed to never be [`ErrorCode::OK`] / [`ErrorCode::SUCCESS`]
+    /// guaranteed to never be [`ResultCode::OK`] / [`ResultCode::SUCCESS`]
     #[must_use]
-    pub const fn code(&self) -> ErrorCode {
-        ErrorCode(self.0.get())
+    pub const fn code(&self) -> ResultCode {
+        ResultCode(self.0.get())
     }
 }
 

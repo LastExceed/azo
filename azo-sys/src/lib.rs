@@ -25,23 +25,23 @@ pub unsafe trait IIASIORedecl: IUnknown {
 	pub fn get_driver_name    (&self, name: *mut u8                                                                                      ) -> ();
 	pub fn get_driver_version (&self,                                                                                                    ) -> DriverVersion;
 	pub fn get_error_message  (&self, string: *mut u8                                                                                    ) -> ();
-	pub fn start              (&self,                                                                                                    ) -> ErrorCode;
-	pub fn stop               (&self,                                                                                                    ) -> ErrorCode;
-	pub fn get_channels       (&self, num_input_channels: *mut c_long, num_output_channels: *mut c_long                                  ) -> ErrorCode;
-	pub fn get_latencies      (&self, input_latency: *mut c_long, output_latency: *mut c_long                                            ) -> ErrorCode;
-	pub fn get_buffer_size    (&self, min_size: *mut c_long, max_size: *mut c_long, preferred_size: *mut c_long, granularity: *mut c_long) -> ErrorCode;
-	pub fn can_sample_rate    (&self, sample_rate: SampleRate                                                                            ) -> ErrorCode;
-	pub fn get_sample_rate    (&self, sample_rate: *mut SampleRate                                                                       ) -> ErrorCode;
-	pub fn set_sample_rate    (&self, sample_rate: SampleRate                                                                            ) -> ErrorCode;
-	pub fn get_clock_sources  (&self, clocks: *mut ClockSource, num_sources: *mut c_long                                                 ) -> ErrorCode;
-	pub fn set_clock_source   (&self, reference: ClockSourceIndex                                                                        ) -> ErrorCode;
-	pub fn get_sample_position(&self, s_pos: *mut Samples, t_stamp: *mut TimeStamp                                                       ) -> ErrorCode;
-	pub fn get_channel_info   (&self, info: *mut ChannelInfo                                                                             ) -> ErrorCode;
-	pub fn create_buffers     (&self, buffer_infos: *mut BufferInfo, num_channels: c_long, buffer_size: c_long, callbacks: *mut Callbacks) -> ErrorCode;
-	pub fn dispose_buffers    (&self,                                                                                                    ) -> ErrorCode;
-	pub fn control_panel      (&self,                                                                                                    ) -> ErrorCode;
-	pub fn future             (&self, selector: c_long, opt: *mut c_void                                                                 ) -> ErrorCode;
-	pub fn output_ready       (&self,                                                                                                    ) -> ErrorCode;
+	pub fn start              (&self,                                                                                                    ) -> ResultCode;
+	pub fn stop               (&self,                                                                                                    ) -> ResultCode;
+	pub fn get_channels       (&self, num_input_channels: *mut c_long, num_output_channels: *mut c_long                                  ) -> ResultCode;
+	pub fn get_latencies      (&self, input_latency: *mut c_long, output_latency: *mut c_long                                            ) -> ResultCode;
+	pub fn get_buffer_size    (&self, min_size: *mut c_long, max_size: *mut c_long, preferred_size: *mut c_long, granularity: *mut c_long) -> ResultCode;
+	pub fn can_sample_rate    (&self, sample_rate: SampleRate                                                                            ) -> ResultCode;
+	pub fn get_sample_rate    (&self, sample_rate: *mut SampleRate                                                                       ) -> ResultCode;
+	pub fn set_sample_rate    (&self, sample_rate: SampleRate                                                                            ) -> ResultCode;
+	pub fn get_clock_sources  (&self, clocks: *mut ClockSource, num_sources: *mut c_long                                                 ) -> ResultCode;
+	pub fn set_clock_source   (&self, reference: ClockSourceIndex                                                                        ) -> ResultCode;
+	pub fn get_sample_position(&self, s_pos: *mut Samples, t_stamp: *mut TimeStamp                                                       ) -> ResultCode;
+	pub fn get_channel_info   (&self, info: *mut ChannelInfo                                                                             ) -> ResultCode;
+	pub fn create_buffers     (&self, buffer_infos: *mut BufferInfo, num_channels: c_long, buffer_size: c_long, callbacks: *mut Callbacks) -> ResultCode;
+	pub fn dispose_buffers    (&self,                                                                                                    ) -> ResultCode;
+	pub fn control_panel      (&self,                                                                                                    ) -> ResultCode;
+	pub fn future             (&self, selector: c_long, opt: *mut c_void                                                                 ) -> ResultCode;
+	pub fn output_ready       (&self,                                                                                                    ) -> ResultCode;
 }
 
 #[repr(transparent)]
@@ -121,7 +121,7 @@ c_enum!(SampleType,
 	DSD_I8_NER_8 = 40
 );
 
-c_enum!(ErrorCode,
+c_enum!(ResultCode, // formery "Error"
 	OK                = 0,
 	SUCCESS           = 0x3f4847a0,
 	NOT_PRESENT       = -1000,
@@ -133,7 +133,7 @@ c_enum!(ErrorCode,
 	NO_MEMORY         = -994
 );
 
-impl ErrorCode {
+impl ResultCode {
 	pub fn ok<T>(self, ok_value: T) -> Result<T, Self>{
         match self {
             Self::OK |

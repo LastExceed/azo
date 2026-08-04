@@ -48,18 +48,18 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 		_placeholder: [0; _]
 	};
 	
-	println!("{:<18}: {}" , stringify!(EnableTimeCodeRead), driver.future::<EnableTimeCodeRead>(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanInputMonitor   ), driver.future::<CanInputMonitor   >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanTimeInfo       ), driver.future::<CanTimeInfo       >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanTimeCode       ), driver.future::<CanTimeCode       >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanTransport      ), driver.future::<CanTransport      >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanInputGain      ), driver.future::<CanInputGain      >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanInputMeter     ), driver.future::<CanInputMeter     >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanOutputGain     ), driver.future::<CanOutputGain     >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanOutputMeter    ), driver.future::<CanOutputMeter    >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{:<18}: {}" , stringify!(CanReportOverload ), driver.future::<CanReportOverload >(&mut ()           ).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{} PCM : {}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_pcm).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
-	println!("{} DSD : {}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_dsd).map_or_else(|error| error.code(), |()| ErrorCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(EnableTimeCodeRead), driver.future::<EnableTimeCodeRead>(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanInputMonitor   ), driver.future::<CanInputMonitor   >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanTimeInfo       ), driver.future::<CanTimeInfo       >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanTimeCode       ), driver.future::<CanTimeCode       >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanTransport      ), driver.future::<CanTransport      >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanInputGain      ), driver.future::<CanInputGain      >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanInputMeter     ), driver.future::<CanInputMeter     >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanOutputGain     ), driver.future::<CanOutputGain     >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanOutputMeter    ), driver.future::<CanOutputMeter    >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{:<18}: {}" , stringify!(CanReportOverload ), driver.future::<CanReportOverload >(&mut ()           ).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{} PCM : {}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_pcm).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
+	println!("{} DSD : {}", stringify!(CanDoIoFormat     ), driver.future::<CanDoIoFormat     >(&mut io_format_dsd).map_or_else(|error| error.code(), |()| ResultCode::SUCCESS));
 	println!();
 	
 	println!("channel\tactive\tgroup\tsmpl_ty\tname");
