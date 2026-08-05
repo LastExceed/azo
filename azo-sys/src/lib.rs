@@ -243,7 +243,7 @@ pub struct Callbacks {
 
 /// Used for driver-to-host messages via [`Callbacks::asio_message`]
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MessageSelector(pub c_long);
 //todo: c_enum macro (requires doc comment support)
 impl MessageSelector {
