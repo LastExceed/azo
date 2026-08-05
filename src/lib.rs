@@ -259,7 +259,7 @@ impl Driver {
     /// This function actually has nothing to do with async code,
     /// it merely provides a mechanism for extending ASIO in the future.
     pub fn future<T: Future>(&self, param: &mut T::Param) -> Result<()> {
-        let selector = T::SELECTOR.0;
+        let selector = T::SELECTOR;
         let opt = ptr::from_mut(param).cast();
         
         let code = unsafe { self.0.future(selector, opt) };

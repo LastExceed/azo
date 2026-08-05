@@ -40,7 +40,7 @@ pub unsafe trait IIASIORedecl: IUnknown {
 	pub fn create_buffers     (&self, buffer_infos: *mut BufferInfo, num_channels: c_long, buffer_size: c_long, callbacks: *mut Callbacks) -> ResultCode;
 	pub fn dispose_buffers    (&self,                                                                                                    ) -> ResultCode;
 	pub fn control_panel      (&self,                                                                                                    ) -> ResultCode;
-	pub fn future             (&self, selector: c_long, opt: *mut c_void                                                                 ) -> ResultCode;
+	pub fn future             (&self, selector: FutureSelector, opt: *mut c_void                                                         ) -> ResultCode;
 	pub fn output_ready       (&self,                                                                                                    ) -> ResultCode;
 }
 
@@ -340,7 +340,7 @@ pub struct ClockSource {
 pub struct ChannelInfo {
 	pub channel      : ChannelIndex,
 	pub is_input     : Bool,
-	pub is_active    : c_long,
+	pub is_active    : Bool,
 	pub channel_group: ChannelGroup,
 	pub sample_type  : SampleType,
 	pub name         : [u8; 32]
@@ -392,9 +392,9 @@ impl FutureSelector {
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InputMonitor {
-	pub input: c_long,
+	pub input: ChannelIndex,
 
-	pub output: c_long,
+	pub output: ChannelIndex,
 	
 	/// `0` = -inf dB<br>
 	/// [`i32::MAX`] = +12 dB
@@ -412,7 +412,7 @@ pub struct InputMonitor {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChannelControls {
 	/// in-param
-	pub channel: c_long,
+	pub channel: ChannelIndex,
 	
 	/// in-param
 	pub is_input: Bool,
