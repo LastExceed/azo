@@ -265,47 +265,32 @@ impl MessageSelector {
 	/// Whether the host supports [`Time::time_code`] in [`Callbacks::buffer_switch_time_info`]
 	/// * Host returns [`Bool`] indicating support
 	pub const SUPPORTS_TIME_CODE: Self = Self(8);
-    
-	/// <div class="warning">OMITTED FROM SPEC</div>
-	/// 
-    /// * `value` indicates command count
-	/// * `message` provides the commands
-	#[cfg(feature = "undocumented")]
-	pub const MMC_COMMAND: Self = Self(9);
-
-	/// <div class="warning">OMITTED FROM SPEC</div>
-	/// 
-	/// * Host returns [`Bool`]
-	#[cfg(feature = "undocumented")]
-	pub const SUPPORTS_INPUT_MONITOR: Self = Self(10);
-	
-	/// <div class="warning">OMITTED FROM SPEC</div>
-	/// 
-	/// * Host returns [`Bool`]
-	#[cfg(feature = "undocumented")]
-	pub const SUPPORTS_INPUT_GAIN: Self = Self(11);
-	
-	/// <div class="warning">OMITTED FROM SPEC</div>
-	/// 
-	/// * Host returns [`Bool`]
-	#[cfg(feature = "undocumented")]
-	pub const SUPPORTS_INPUT_METER: Self = Self(12);
-	
-	/// <div class="warning">OMITTED FROM SPEC</div>
-	/// 
-	/// * Host returns [`Bool`]
-	#[cfg(feature = "undocumented")]
-	pub const SUPPORTS_OUTPUT_GAIN: Self = Self(13);
-	
-	/// <div class="warning">OMITTED FROM SPEC</div>
-	/// 
-	/// * Host returns [`Bool`]
-	#[cfg(feature = "undocumented")]
-	pub const SUPPORTS_OUTPUT_METER: Self = Self(14);
 	
 	/// The driver detected an overload
 	/// * Host returns whatever it wants (driver may ignore it)
 	pub const OVERLOAD: Self = Self(15);
+}
+
+#[cfg(feature = "undocumented")]
+impl MessageSelector {
+    /// * `value` indicates command count
+	/// * `message` provides the commands
+	pub const MMC_COMMAND: Self = Self(9);
+
+	/// * Host returns [`Bool`]
+	pub const SUPPORTS_INPUT_MONITOR: Self = Self(10);
+	
+	/// * Host returns [`Bool`]
+	pub const SUPPORTS_INPUT_GAIN: Self = Self(11);
+	
+	/// * Host returns [`Bool`]
+	pub const SUPPORTS_INPUT_METER: Self = Self(12);
+	
+	/// * Host returns [`Bool`]
+	pub const SUPPORTS_OUTPUT_GAIN: Self = Self(13);
+	
+	/// * Host returns [`Bool`]
+	pub const SUPPORTS_OUTPUT_METER: Self = Self(14);
 }
 
 #[repr(C)]
