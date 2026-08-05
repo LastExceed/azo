@@ -49,13 +49,13 @@ pub unsafe trait IIASIORedecl: IUnknown {
 pub struct DriverVersion(pub c_long);
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChannelGroup(pub c_long);
 
 pub type ChannelIndex = c_long;
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ClockSourceIndex(pub c_long);
 
 pub type U31 = c_long; // todo
@@ -170,7 +170,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TimeInfo {
 	pub speed          : c_double,
 	pub system_time    : TimeStamp,
@@ -320,7 +320,7 @@ impl MessageSelector {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClockSource {
     /// For use in [`IIASIORedecl::set_clock_source()`]
     pub index: ClockSourceIndex,
@@ -409,7 +409,7 @@ pub struct InputMonitor {
 
 #[cfg(feature = "undocumented")]
 #[repr(C)]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChannelControls {
 	/// in-param
 	pub channel: c_long,
@@ -465,7 +465,7 @@ pub struct IoFormat {
 }
 
 #[repr(C)]
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InternalBufferInfo {
 	pub input_samples: c_long,
 	pub output_samples: c_long
