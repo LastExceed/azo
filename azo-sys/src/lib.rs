@@ -44,22 +44,11 @@ pub unsafe trait IIASIORedecl: IUnknown {
 	pub fn output_ready       (&self,                                                                                                    ) -> ResultCode;
 }
 
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DriverVersion(pub c_long);
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChannelGroup(pub c_long);
-
-pub type ChannelIndex = c_long;
-
-#[repr(transparent)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ClockSourceIndex(pub c_long);
-
-pub type U31 = c_long; // todo
-
+pub type DriverVersion     = c_long;
+pub type ChannelGroupIndex = c_long;
+pub type ChannelIndex      = c_long;
+pub type ClockSourceIndex  = c_long;
+pub type U31               = c_long; // todo
 pub type Samples    = i64;
 pub type TimeStamp  = i64;
 pub type SampleRate = f64;
@@ -328,7 +317,7 @@ pub struct ClockSource {
 	/// E.g. S/PDIF, AES/EBU
 	pub associated_channel: ChannelIndex,
 
-	pub associated_group: ChannelGroup,
+	pub associated_group: ChannelGroupIndex,
 	
 	pub is_current_source: Bool,
 	
@@ -341,7 +330,7 @@ pub struct ChannelInfo {
 	pub channel      : ChannelIndex,
 	pub is_input     : Bool,
 	pub is_active    : Bool,
-	pub channel_group: ChannelGroup,
+	pub channel_group: ChannelGroupIndex,
 	pub sample_type  : SampleType,
 	pub name         : [u8; 32]
 }

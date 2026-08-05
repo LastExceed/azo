@@ -31,8 +31,8 @@ fn dump_info(driver: &Driver) -> azo::Result<()> {
 	let buffer_size    = driver.buffer_size()?;
 	let sample_rate    = driver.get_sample_rate()?;
 	
-	println!("driver_name   : {}"           , driver_name.to_string_lossy());
-	println!("driver_version: {}"           , driver_version.0);
+	println!("driver_name   : {}", driver_name.to_string_lossy());
+	println!("driver_version: {driver_version}");
 	println!("channels      : {} in, {} out", channel_counts.in_, channel_counts.out);
 	println!("latencies     : {} in, {} out", latencies.in_, latencies.out);
 	println!("sample_rate   : {sample_rate}");

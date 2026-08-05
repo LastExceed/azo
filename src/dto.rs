@@ -24,7 +24,7 @@ pub struct SamplePosition {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChannelInfoResponse {
     pub is_active  : bool,
-	pub group      : sys::ChannelGroup,
+	pub group      : sys::ChannelGroupIndex,
 	pub sample_type: sys::SampleType,
 	pub name       : CString
 }
