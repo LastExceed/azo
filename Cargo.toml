@@ -23,7 +23,7 @@ readme.workspace = true
 repository.workspace = true
 
 [features]
-default = ["undocumented"]
+default = []
 undocumented = []
 
 [dependencies]
