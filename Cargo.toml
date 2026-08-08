@@ -12,7 +12,7 @@ repository = "https://github.com/LastExceed/azo"
 
 [package]
 name = "azo"
-description = "Re-implementation of ASIO (Audio Stream Input/Output)"
+description = "Library for interacting with ASIO drivers"
 publish = true
 version.workspace = true
 edition.workspace = true
