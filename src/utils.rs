@@ -1,4 +1,5 @@
 use std::ffi::*;
+use std::marker::PhantomData;
 use windows_core::{IUnknown, Interface};
 use crate::windows_bindings::*;
 use super::*;
@@ -24,12 +25,12 @@ pub fn cstring_from_bytes_until_nul(buffer: &[u8]) -> CString {
 
 /// This ZST ensures correct pairing of calls to [`CoInitializeEx`] and [`CoUninitialize`]
 #[derive(Debug)]
-pub struct COM(()); // private field to prevent manual construction
+pub struct COM(PhantomData<*const ()>); // private field to prevent manual construction. Phantom pointer to make the type !Send
 
 impl COM {
 	pub fn new(coinit: COINIT) -> windows_core::Result<Self> {
 		unsafe { CoInitializeEx(None, coinit) }.ok()?;
-		Ok(Self(()))
+		Ok(Self(PhantomData))
 	}
 
     #[expect(clippy::unused_self, reason = "required as a guarantee that COM is initialized")]
