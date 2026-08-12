@@ -1,6 +1,6 @@
 pub mod dto;
 pub mod future;
-mod utils;
+pub mod utils;
 #[expect(
     dead_code,
     non_snake_case,
@@ -20,15 +20,17 @@ use std::num::NonZeroI32;
 use std::{fmt, mem, ptr};
 use std::ffi::*;
 use sys::{ResultCode, IIASIORedecl};
-use windows_core::{GUID, HSTRING};
+use windows_core::{GUID, HSTRING, IUnknown};
 use self::dto::Granularity;
 use self::future::Future;
+use self::utils::com::cast_decoupled;
 use self::utils::*;
 
+use self::windows_bindings::{CLSCTX_SERVER, CoCreateInstance};
 pub use self::windows_bindings::{HWND, HANDLE, COINIT, COINIT_APARTMENTTHREADED};
 pub use azo_sys as sys;
 
-type WinResult<T> = windows_core::Result<T>;
+pub type WinResult<T> = windows_core::Result<T>;
 
 /// Gathers the metadata of all ASIO drivers currently registered in the system.
 /// 
@@ -72,17 +74,39 @@ impl DriverMetadata {
         Ok(Self { clsid, description })
     }
     
-    pub fn create_instance(&self) -> WinResult<Driver> {
-        let com = COM::new(COINIT_APARTMENTTHREADED)?;
-        let interface = com.create_driver_instance(&raw const self.clsid)?;
-
-        Ok(Driver(interface, com))
+    pub fn create_instance(&self) -> WinResult<com::InitGuard<Driver>> {
+        let empty_guard = com::InitGuard::new(COINIT_APARTMENTTHREADED)?; // this initializes COM
+        
+        let driver = unsafe { Driver::new_unguarded(&self.clsid) }?;
+        
+        let populated_guard = empty_guard.map(|()| driver);
+        Ok(populated_guard)
     }
 }
 
 #[derive(Debug)]
-pub struct Driver(IIASIORedecl, COM);
+pub struct Driver(IIASIORedecl);
+
+// Can't use marshaling anyway, so might as well
+unsafe impl Send for Driver {}
+unsafe impl Sync for Driver {}
+
 impl Driver {
+    /// # Safety
+    /// Caller needs to ensure that COM is initialized,
+    /// and stays that way until this [`Driver`] got dropped
+    pub unsafe fn new_unguarded(guid: &GUID) -> WinResult<Self> {
+        // Created as `IUnknown` because windows-rs binds this function in
+        // a way where the IID is acquired from a trait-associated constant,
+        // which is impossible to implement for `IIASIORedecl` (see its doc comment)
+        let i_unknown: IUnknown = unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER) }?;
+
+        // The aforementioned binding limitation also applies to `.cast()`.
+        // Luckily, the underlying `.query()` is public, which enables the following work-around:
+        unsafe { cast_decoupled::<IIASIORedecl>(&i_unknown, guid) }
+        .map(Self)
+    }
+    
     #[must_use]
     pub fn init(&self, main_window_handle: Option<HWND>) -> bool {
         let sys_ref = main_window_handle.unwrap_or_default(); 
