@@ -5,7 +5,7 @@
 #[macro_use]
 mod utils;
 
-use std::ffi::*;
+use std::{ffi::*, mem};
 use bitflags::bitflags;
 use windows_core::{interface, IUnknown, IUnknown_Vtbl};
 
@@ -142,6 +142,18 @@ pub struct TimeCode {
 	pub _placeholder: [c_char; 64]
 }
 
+impl TimeCode {
+	/// Creates an "invalid" instance of `Self`,
+	/// meaning that the [`TimeCodeFlags::VALID`] bit in [`TimeCode::flags`] is not set,
+	/// and the remaining values are unspecified.
+	#[must_use]
+	pub const fn invalid() -> Self {
+		// SAFETY:
+		// `Self` is valid for any bit pattern
+		unsafe { mem::zeroed() }
+	}
+}
+
 bitflags! {
 	#[repr(transparent)]
 	#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -229,6 +241,24 @@ pub struct Callbacks {
     pub asio_message: AsioMessage,
     pub buffer_switch_time_info: BufferSwitchTimeInfo
 }
+
+impl Callbacks {
+	/// Convenience function for creating an instance of `Self` with pointers to valid but empty functions.
+	#[must_use]
+	pub fn noop() -> Self {
+		Self {
+			buffer_switch          : noop_buffer_switch,
+			sample_rate_did_change : noop_sample_rate_did_change,
+			asio_message           : noop_asio_message,
+			buffer_switch_time_info: noop_buffer_switch_time_info
+		}
+	}
+}
+
+const unsafe extern "system" fn noop_buffer_switch(_: i32, _: Bool) {}
+const unsafe extern "system" fn noop_sample_rate_did_change(_: f64) {}
+const unsafe extern "system" fn noop_asio_message(_: MessageSelector, _: i32, _: *const c_void, _: *const f64) -> i32 { 0 }
+const unsafe extern "system" fn noop_buffer_switch_time_info(time: *mut Time, _: i32, _: Bool) -> *mut Time { time }
 
 /// Used for driver-to-host messages via [`Callbacks::asio_message`]
 #[repr(C)]

@@ -21,6 +21,24 @@ pub struct SamplePosition {
     pub time_stamp: sys::TimeStamp
 }
 
+impl From<SamplePosition> for sys::Time {
+    fn from(pos: SamplePosition) -> Self {
+        Self {
+            _reserved: [0; 4],
+            time_info: sys::TimeInfo {
+                speed          : Default::default(), // not marked valid
+                system_time    : pos.time_stamp,
+                sample_position: pos.position,
+                sample_rate    : Default::default(), // not marked valid
+                flags          : sys::TimeInfoFlags::SYSTEM_TIME_VALID
+                               | sys::TimeInfoFlags::SAMPLE_POSITION_VALID,
+                _reserved      : [0; 12]
+            },
+            time_code: sys::TimeCode::invalid()
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChannelInfoResponse {
     pub is_active  : bool,
