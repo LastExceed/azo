@@ -402,11 +402,13 @@ impl FutureSelector {
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InputMonitor {
+	/// `-1` = all
 	pub input: ChannelIndex,
 
 	pub output: ChannelIndex,
 	
 	/// `0` = -inf dB<br>
+	/// `0x20000000` = 0 dB<br>
 	/// [`i32::MAX`] = +12 dB
 	pub gain: U31,
 
