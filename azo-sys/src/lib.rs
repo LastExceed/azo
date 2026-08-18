@@ -154,6 +154,12 @@ impl TimeCode {
 	}
 }
 
+impl Default for TimeCode {
+	fn default() -> Self {
+		Self::invalid()
+	}
+}
+
 bitflags! {
 	#[repr(transparent)]
 	#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
@@ -171,7 +177,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct TimeInfo {
 	pub speed          : c_double,
 	pub system_time    : TimeStamp,
@@ -195,7 +201,7 @@ bitflags! {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Time {
     pub _reserved: [c_long; 4],
     pub time_info: TimeInfo,
