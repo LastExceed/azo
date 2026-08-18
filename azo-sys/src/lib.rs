@@ -184,7 +184,7 @@ pub struct TimeInfo {
 	pub sample_position: Samples,
 	pub sample_rate    : SampleRate,
 	pub flags          : TimeInfoFlags,
-	pub reserved       : [c_char; 12]
+	pub _reserved      : [c_char; 12]
 }
 
 bitflags! {
@@ -242,9 +242,9 @@ pub type BufferSwitchTimeInfo =
 #[repr(C)]
 #[derive(Debug, Clone, Hash)]
 pub struct Callbacks {
-    pub buffer_switch: BufferSwitch,
-    pub sample_rate_did_change: SampleRateDidChange,
-    pub asio_message: AsioMessage,
+    pub buffer_switch          : BufferSwitch,
+    pub sample_rate_did_change : SampleRateDidChange,
+    pub asio_message           : AsioMessage,
     pub buffer_switch_time_info: BufferSwitchTimeInfo
 }
 
