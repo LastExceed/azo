@@ -108,6 +108,11 @@ impl Driver {
     }
     
     #[must_use]
+    pub const fn as_raw(&self) -> &IIASIORedecl {
+        &self.0
+    }
+    
+    #[must_use]
     pub fn init(&self, main_window_handle: Option<HWND>) -> bool {
         let sys_ref = main_window_handle.unwrap_or_default(); 
 
