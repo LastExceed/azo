@@ -216,10 +216,10 @@ pub type AsioMessage =
 /// Similar to [`BufferSwitch`], but with additional timing info.
 pub type BufferSwitchTimeInfo =
 	unsafe extern "system" fn(
-		params             : *const Time,
+		params             : *mut Time,
 		double_buffer_index: c_long,
 		direct_process     : Bool
-	) -> Time;
+	) -> *mut Time;
 
 #[repr(C)]
 #[derive(Debug, Clone, Hash)]

@@ -133,10 +133,10 @@ unsafe extern "system" fn asio_message(
 }
 
 unsafe extern "system" fn buffer_switch_time_info(
-	_params             : *const Time,
+	_params             : *mut Time,
 	_double_buffer_index: c_long,
 	_direct_process     : Bool
-) -> Time {
+) -> *mut Time {
 	unimplemented!()
 }
 
