@@ -33,16 +33,22 @@ type WinResult<T> = windows_core::Result<T>;
 /// Gathers the metadata of all ASIO drivers currently registered in the system.
 /// 
 /// This is the "starting point" of this library.
+/// 
+/// Registry entries which can't be read are skipped, so that a single
+/// malformed entry doesn't hide all other drivers.
 pub fn get_drivers() -> WinResult<Vec<DriverMetadata>> {
     let software_key = windows_registry::LOCAL_MACHINE.open("SOFTWARE\\ASIO")?;
         
-    software_key
-    .keys()?
-    .map(|driver_key_name| {
-        let driver_key = software_key.open(&driver_key_name)?;
-        DriverMetadata::from_registry(&driver_key)
-    })
-    .collect()
+    let drivers =
+        software_key
+        .keys()?
+        .filter_map(|driver_key_name| {
+            let driver_key = software_key.open(&driver_key_name).ok()?;
+            DriverMetadata::from_registry(&driver_key).ok()
+        })
+        .collect();
+    
+    Ok(drivers)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
