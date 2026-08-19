@@ -29,3 +29,8 @@ jobs:
 
       - name: Clippy (all features)
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      # Without `--workspace` the features of `azo-sys` are only whatever `azo`
+      # forwards to it, which is what a dependent crate gets.
+      - name: Clippy (`azo` on its own)
+        run: cargo clippy --package azo --all-targets --all-features -- -D warnings

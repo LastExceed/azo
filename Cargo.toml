@@ -24,7 +24,7 @@ repository.workspace = true
 
 [features]
 default = []
-undocumented = []
+undocumented = ["azo-sys/undocumented"]
 
 [dependencies]
 azo-sys = { path = "./azo-sys", version = "0.0.8" }
