@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  # `push` checks the branch itself, `pull_request` checks the merge result.
+  push:
+  pull_request:
+
+# A second push to a branch cancels the run still going for the first one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    # ASIO is Windows-only, and the build script runs `windows-bindgen`
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Check (default features)
+        run: cargo check --workspace
+
+      - name: Check (all features)
+        run: cargo check --workspace --all-features
+
+      - name: Clippy
+        # The two allows are pre-existing and deliberate: `clippy::restriction` is
+        # enabled as a group on the generated bindings, and `COM` is spelled that way
+        # on purpose. Everything else is denied so new lints fail the build.
+        run: >
+          cargo clippy --workspace --all-features --
+          -D warnings
+          -A clippy::blanket_clippy_restriction_lints
+          -A clippy::upper_case_acronyms
