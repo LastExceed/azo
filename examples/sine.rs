@@ -78,8 +78,11 @@ fn create_sine_wave_generator(frequency: f64, sample_rate: f64) -> impl Iterator
 	})
 }
 
+/// Writes a single sample, converted to the driver's native sample format.
+type SampleWriter<W> = fn(f64, &mut W) -> io::Result<()>;
+
 /// Could be cleaned up with macros and/or numtraits, but that would likely make it harder to read
-fn match_sample_type<W: Write>(sample_type: SampleType) -> (usize, fn(f64, &mut W) -> io::Result<()>) {
+fn match_sample_type<W: Write>(sample_type: SampleType) -> (usize, SampleWriter<W>) {
 	const I18_MAX: i32 = 0x00_01_FF_FF;
 	const I20_MAX: i32 = 0x00_07_FF_FF;
 	const I24_MAX: i32 = 0x00_7F_FF_FF;
@@ -125,9 +128,9 @@ unsafe extern "system" fn buffer_switch(buffer_index: c_long, _direct_process: B
 	
 	use TrySendError::*;
 	match send_result {
-		Ok(()) => return, // nothing more to do here, the rest is up to the processing thread
+		Ok(()) => (), // nothing more to do here, the rest is up to the processing thread
 		
-		Err(Full(_)) => return, // processing thread fell behind / froze / died / whatever.
+		Err(Full(_)) => (),     // processing thread fell behind / froze / died / whatever.
 		                        // An underrun is imminent (audible glitches).
 			                    // In production, consider handling this scenario more gracefully
 								// e.g. by initiating a buffer size increase.
