@@ -34,3 +34,15 @@ jobs:
       # forwards to it, which is what a dependent crate gets.
       - name: Clippy (`azo` on its own)
         run: cargo clippy --package azo --all-targets --all-features -- -D warnings
+
+  publish-dry-run:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # `--workspace` verifies `azo` against the locally packaged `azo-sys`,
+      # rather than the version already on crates.io.
+      - name: Publish dry-run
+        run: cargo publish --dry-run --workspace
