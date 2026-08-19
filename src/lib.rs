@@ -8,8 +8,9 @@ pub mod utils;
     unused_results,
     clippy::nursery,
     clippy::pedantic,
-    clippy::restriction,
     clippy::style,
+    clippy::restriction,
+    clippy::blanket_clippy_restriction_lints, // false positive due to above
     reason = "generated"
 )]
 mod windows_bindings {
