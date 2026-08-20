@@ -1,0 +1,25 @@
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+name: Publish on crates.io
+
+jobs:
+  publish:
+    name: Publish
+    # ASIO is Windows-only, and `cargo publish` builds the crate to verify it
+    runs-on: windows-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v5
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # `--workspace` publishes `azo-sys` first and waits for it to show up on the
+      # index before publishing `azo`, which depends on it.
+      - name: Publish crates
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --workspace
