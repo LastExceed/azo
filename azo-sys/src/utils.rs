@@ -28,5 +28,17 @@ macro_rules! c_enum {
 				write!(f, "{}::{}({})", stringify!($enum_name), self, self.0)
 			}
 		}
+		
+		impl From<std::ffi::c_long> for $enum_name {
+			fn from(value: std::ffi::c_long) -> Self {
+				Self(value)
+			}
+		}
+		
+		impl From<$enum_name> for std::ffi::c_long {
+			fn from(value: $enum_name) -> Self {
+				value.0
+			}
+		}
 	}
 }
