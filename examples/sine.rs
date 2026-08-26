@@ -19,6 +19,12 @@ fn main() {
 	}
 }
 
+#[expect(
+	clippy::panic_in_result_fn,
+	clippy::unwrap_in_result,
+	clippy::infinite_loop,
+	reason = "simplicity"
+)]
 fn play_sine(driver: &azo::Driver) -> azo::Result<()> {
 	let (sender, receiver) = mpsc::sync_channel::<c_long>(2);
 	SENDER.set(sender).unwrap();
@@ -128,7 +134,7 @@ unsafe extern "system" fn buffer_switch(buffer_index: c_long, _direct_process: B
 	
 	use TrySendError::*;
 	match send_result {
-		Ok(()) => (), // nothing more to do here, the rest is up to the processing thread
+		Ok(()) | // nothing more to do here, the rest is up to the processing thread
 		
 		Err(Full(_)) => (),     // processing thread fell behind / froze / died / whatever.
 		                        // An underrun is imminent (audible glitches).
@@ -143,7 +149,7 @@ unsafe extern "system" fn sample_rate_did_change(_rate: SampleRate) {
 	unimplemented!()
 }
 
-unsafe extern "system" fn asio_message(
+const unsafe extern "system" fn asio_message(
 	_selector: MessageSelector,
 	_value   : c_long,
 	_message : *const c_void,
