@@ -1,11 +1,19 @@
 macro_rules! c_enum {
-	($enum_name:ident, $($variant_name:ident = $value:literal),+) => {
+	(
+		$(#[$struct_attr:meta])*
+		$enum_name:ident,
+		$(
+			$(#[$variant_attr:meta])*
+			$variant_name:ident = $value:literal
+		),+
+	) => {
 		#[repr(transparent)]
 		#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 		pub struct $enum_name(pub std::ffi::c_long);
 
 		impl $enum_name {
 			$(
+				$(#[$variant_attr])*
 				pub const $variant_name: Self = Self($value);
 			)+
 		}
