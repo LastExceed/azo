@@ -9,6 +9,7 @@ macro_rules! c_enum {
 	) => {
 		#[repr(transparent)]
 		#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+		$(#[$struct_attr])*
 		pub struct $enum_name(pub std::ffi::c_long);
 
 		impl $enum_name {
