@@ -266,46 +266,45 @@ const unsafe extern "system" fn noop_sample_rate_did_change(_: f64) {}
 const unsafe extern "system" fn noop_asio_message(_: MessageSelector, _: i32, _: *const c_void, _: *const f64) -> i32 { 0 }
 const unsafe extern "system" fn noop_buffer_switch_time_info(time: *mut Time, _: i32, _: Bool) -> *mut Time { time }
 
-/// Used for driver-to-host messages via [`Callbacks::asio_message`]
-#[repr(C)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MessageSelector(pub c_long);
-//todo: c_enum macro (requires doc comment support)
-impl MessageSelector {
+c_enum!(
+	/// Used for driver-to-host messages via [`Callbacks::asio_message`]
+	MessageSelector,
+
 	/// * Host returns [`Bool`] indicating whether the [`MessageSelector`] specified in `value` is supported.
-	pub const SELECTOR_SUPPORTED: Self = Self(1);
+	SELECTOR_SUPPORTED = 1,
 
     /// * Host returns its ASIO version (2+)
-    pub const ENGINE_VERSION: Self = Self(2);
+    ENGINE_VERSION = 2,
 
 	/// The host should release the COM interface and start over.
 	/// * Host returns [`Bool`] indicating whether the request will be honored
-	pub const RESET_REQUEST: Self = Self(3);
+	RESET_REQUEST = 3,
     
 	/// The driver resizes its buffers to `value`.
 	/// * Host returns [`Bool`] indicating compatibility
-	pub const BUFFER_SIZE_CHANGE: Self = Self(4);
+	BUFFER_SIZE_CHANGE = 4,
     
 	/// The driver's timings desynced.
     /// * Host returns [`Bool`] indicating resync support
-	pub const RESYNC_REQUEST: Self = Self(5);
+	RESYNC_REQUEST = 5,
     
     /// The host needs to re-fetch the latencies.
 	/// * Host returns [`Bool`] indicating whether this selector is supported
-	pub const LATENCIES_CHANGED: Self = Self(6);	
+	LATENCIES_CHANGED = 6,	
     
 	/// Whether the host supports [`Callbacks::buffer_switch_time_info`]
     /// * Host returns [`Bool`] indicating support
-	pub const SUPPORTS_TIME_INFO: Self = Self(7);
+	SUPPORTS_TIME_INFO = 7,
     
 	/// Whether the host supports [`Time::time_code`] in [`Callbacks::buffer_switch_time_info`]
 	/// * Host returns [`Bool`] indicating support
-	pub const SUPPORTS_TIME_CODE: Self = Self(8);
+	SUPPORTS_TIME_CODE = 8,
 	
 	/// The driver detected an overload
 	/// * Host returns whatever it wants (driver may ignore it)
-	pub const OVERLOAD: Self = Self(15);
-}
+	OVERLOAD = 15
+);
+
 
 #[cfg(feature = "undocumented")]
 impl MessageSelector {
