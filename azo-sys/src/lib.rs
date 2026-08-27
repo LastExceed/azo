@@ -48,7 +48,7 @@ pub type DriverVersion     = c_long;
 pub type ChannelGroupIndex = c_long;
 pub type ChannelIndex      = c_long;
 pub type ClockSourceIndex  = c_long;
-pub type U31               = c_long; // todo
+pub type NonNegativeI32    = c_long;
 pub type Samples    = i64;
 pub type TimeStamp  = i64;
 pub type SampleRate = f64;
@@ -409,13 +409,13 @@ pub struct InputMonitor {
 	/// `0` = -inf dB<br>
 	/// `0x20000000` = 0 dB<br>
 	/// [`i32::MAX`] = +12 dB
-	pub gain: U31,
+	pub gain: NonNegativeI32,
 
 	pub state: Bool,
 	
 	/// `0` = max left<br>
 	/// [`i32::MAX`] = max right
-	pub pan: U31
+	pub pan: NonNegativeI32
 }
 
 #[cfg(feature = "undocumented")]
@@ -429,10 +429,10 @@ pub struct ChannelControls {
 	pub is_input: Bool,
 
 	/// out-param
-	pub gain: U31,
+	pub gain: NonNegativeI32,
 
 	/// out-param
-	pub meter: U31,
+	pub meter: NonNegativeI32,
 
 	pub _placeholder: [c_char; 32]
 }
