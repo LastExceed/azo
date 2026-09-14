@@ -54,6 +54,7 @@ pub fn get_drivers() -> WinResult<Vec<DriverMetadata>> {
     Ok(drivers)
 }
 
+/// Metadata of an ASIO driver, retrieved from the system registry via [`get_drivers`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DriverMetadata {
     pub clsid: GUID,
@@ -94,7 +95,7 @@ unsafe impl Sync for Driver {}
 
 impl Driver {
     /// # Safety
-    /// Caller needs to ensure that COM is initialized,
+    /// Caller needs to ensure that COM is initialized on this thread,
     /// and stays that way until this [`Driver`] got dropped
     pub unsafe fn new_unguarded(guid: &GUID) -> WinResult<Self> {
         // Created as `IUnknown` because windows-rs binds this function in
@@ -108,11 +109,13 @@ impl Driver {
         .map(Self)
     }
     
+    /// Exposes the underlying COM interface pointer
     #[must_use]
     pub const fn as_raw(&self) -> &IIASIORedecl {
         &self.0
     }
     
+    /// The spec unfortunately does not elaborate on the purpose of the parameter.
     #[must_use]
     pub fn init(&self, main_window_handle: Option<HWND>) -> bool {
         let sys_ref = main_window_handle.unwrap_or_default(); 
@@ -122,6 +125,7 @@ impl Driver {
         .unwrap_or(false)
     }
     
+    /// Usually (but not necessarily) the same as [`DriverMetadata::description`].
     #[must_use]
     pub fn name(&self) -> CString {
         let mut buf = [0_u8; 32];
@@ -129,40 +133,52 @@ impl Driver {
         cstring_from_bytes_until_nul(&buf)
     }
 
+    /// Intended to be the major ASIO version (`2` since the release of ASIO 2.0 in 1999),
+    /// but technically allowed to be higher by spec, and many report their own (independent) version this way.
     #[must_use]
     pub fn version(&self) -> sys::DriverVersion {
         unsafe { self.0.get_driver_version() }
     }
-    
+
+    /// Retrieves a message associated with the recentmost error.
     #[must_use]
     pub fn last_error(&self) -> CString {
         let mut buf = [0_u8; 124];
         unsafe { self.0.get_error_message(buf.as_mut_ptr()); }
         cstring_from_bytes_until_nul(&buf)
     }
-    
+
+    /// Drivers typically invoke the [`buffer_switch`](sys::Callbacks::buffer_switch) / [`buffer_switch_time_info`](sys::Callbacks::buffer_switch_time_info)
+    /// callback 1+ times during (or immediately after) this function call to prime the output buffer(s).
     pub fn start(&self) -> Result<()> {
         let code = unsafe { self.0.start() };
         create_result((), code)
     }
     
+    /// Halts the streaming.<br>
+    /// The driver remains ready to resume via [`.start()`](Self::start).
     pub fn stop(&self) -> Result<()> {
         let code = unsafe { self.0.stop() };
         create_result((), code)
     }
 
+    /// Returns the number of channels in each direction.
 	pub fn channel_counts(&self) -> Result<dto::ChannelCounts> {
         let mut counts = dto::ChannelCounts { in_: 0, out: 0 };
         let code = unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) };
         create_result(counts, code)
     }
 
+    /// Accounts for buffer size, assuming [`BufferSize::preferred`](dto::BufferSize::preferred)
+    /// when called before [`.create_buffers()`](Self::create_buffers).
     pub fn latencies(&self) -> Result<dto::Latencies> {
         let mut latencies = dto::Latencies { in_: 0, out: 0 };
         let code = unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) };
         create_result(latencies, code)
     }
 
+    /// Retrieves buffer size(s) supported by the driver.<br>
+    /// These can depend on the current sample rate.
     pub fn buffer_size(&self) -> Result<dto::BufferSize> {
         let mut min         = -1;
         let mut max         = -2;
@@ -170,8 +186,6 @@ impl Driver {
         let mut granularity = -4;
         let code = unsafe { self.0.get_buffer_size(&raw mut min, &raw mut max, &raw mut preferred, &raw mut granularity) };
         create_result((), code)?;
-        
-        // note the doc-comment on `BufferSize`
 
         let buffer_size =
             dto::BufferSize {
@@ -184,22 +198,26 @@ impl Driver {
         Ok(buffer_size)
     }
 
+    /// Checks whether the specified `sample_rate` is supported.
 	pub fn can_sample_rate(&self, sample_rate: sys::SampleRate) -> Result<()> {
         let code = unsafe { self.0.can_sample_rate(sample_rate) };
         create_result((), code)
     }
     
+    /// Returns the current sample rate.
     pub fn get_sample_rate(&self) -> Result<sys::SampleRate> {
         let mut sample_rate = f64::NAN;
         let code = unsafe { self.0.get_sample_rate(&raw mut sample_rate) };
         create_result(sample_rate, code)
     }
     
+    /// 0 = external sync
     pub fn set_sample_rate(&self, sample_rate: sys::SampleRate) -> Result<()> {
         let code = unsafe { self.0.set_sample_rate(sample_rate) };
         create_result((), code)
     }
-    
+
+    /// Retrieves a list of all clock sources available to this driver.
     #[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
 	pub fn clock_sources(&self) -> Result<Vec<sys::ClockSource>> {
         let mut count = 1;
@@ -220,6 +238,7 @@ impl Driver {
         }
     }
 
+    /// Selects a [`ClockSource`](sys::ClockSource), as enumerated via [`.clock_sources()`](Self::clock_sources)
 	pub fn set_clock_source(&self, clock_source: sys::ClockSourceIndex) -> Result<()> {
         let code = unsafe { self.0.set_clock_source(clock_source) };
         create_result((), code)

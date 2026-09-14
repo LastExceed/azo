@@ -110,7 +110,10 @@ c_enum!(SampleType,
 	DSD_I8_NER_8 = 40
 );
 
-c_enum!(ResultCode, // formery "Error"
+c_enum!(
+	/// Formery "Error"
+	ResultCode,
+
 	OK                = 0,
 	SUCCESS           = 0x3f4847a0,
 	NOT_PRESENT       = -1000,
@@ -184,6 +187,7 @@ pub struct TimeInfo {
 	pub sample_position: Samples,
 	pub sample_rate    : SampleRate,
 	pub flags          : TimeInfoFlags,
+	/// Must be zeroed
 	pub _reserved      : [c_char; 12]
 }
 
@@ -363,7 +367,10 @@ pub struct BufferInfo {
 	pub buffers    : [*mut c_void; 2]
 }
 
-c_enum!(FutureSelector,
+c_enum!(
+	/// Used for host-to-driver messages via [`IIASIORedecl::future`]
+	FutureSelector,
+
 	ENABLE_TIME_CODE_READ  = 1,
 	DISABLE_TIME_CODE_READ = 2,
 	SET_INPUT_MONITOR      = 3,

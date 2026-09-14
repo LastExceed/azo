@@ -21,7 +21,7 @@ impl<T> InitGuard<T> {
 	}
 	
 	/// # Safety
-	/// `T` must not outlive `Dropper`
+	/// `T` must not outlive [`Dropper`]
 	pub unsafe fn into_inner(self) -> (T, Dropper) {
 		(self.0, self.1)
 	}
