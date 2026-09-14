@@ -253,21 +253,18 @@ pub struct Callbacks {
 }
 
 impl Callbacks {
-	/// Convenience function for creating an instance of `Self` with pointers to valid but empty functions.
-	#[must_use]
-	pub fn noop() -> Self {
-		Self {
-			buffer_switch          : noop_buffer_switch,
-			sample_rate_did_change : noop_sample_rate_did_change,
-			asio_message           : noop_asio_message,
-			buffer_switch_time_info: noop_buffer_switch_time_info
-		}
-	}
+	/// Valid pointers to static empty functions
+	pub const NOOP: Self = Self {
+		buffer_switch          : noop_buffer_switch,
+		sample_rate_did_change : noop_sample_rate_did_change,
+		asio_message           : noop_asio_message,
+		buffer_switch_time_info: noop_buffer_switch_time_info
+	};
 }
 
 const unsafe extern "system" fn noop_buffer_switch(_: i32, _: Bool) {}
 const unsafe extern "system" fn noop_sample_rate_did_change(_: f64) {}
-const unsafe extern "system" fn noop_asio_message(_: MessageSelector, _: i32, _: *const c_void, _: *const f64) -> i32 { 0 }
+const unsafe extern "system" fn noop_asio_message(_: MessageSelector, _: i32, _: *const c_void, _: *const f64) -> i32 { Bool::FALSE.0 }
 const unsafe extern "system" fn noop_buffer_switch_time_info(time: *mut Time, _: i32, _: Bool) -> *mut Time { time }
 
 c_enum!(
