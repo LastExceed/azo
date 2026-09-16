@@ -272,9 +272,7 @@ impl Driver {
         channels: impl IntoIterator<Item=dto::ChannelId>,
         buffer_size: c_long,
         callbacks: *const sys::Callbacks
-    )
-    -> Result<impl Iterator<Item=[*mut c_void; 2]>>
-    {
+    ) -> Result<impl Iterator<Item=[*mut c_void; 2]>> {
         let mut infos =
             channels
             .into_iter()
