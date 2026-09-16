@@ -1,5 +1,4 @@
 #![allow(clippy::pub_underscore_fields, reason = "placeholders")]
-#![expect(clippy::transmute_ptr_to_ptr, reason = "occurs in a proc macro (`interface`)")]
 #![expect(clippy::unusual_byte_groupings, reason = "easter eggs")]
 
 #[macro_use]
@@ -7,7 +6,7 @@ mod utils;
 
 use std::{ffi::*, mem};
 use bitflags::bitflags;
-use windows_core::{interface, IUnknown, IUnknown_Vtbl};
+use windows_core::{interface, IUnknown};
 
 use self::utils::I64Split;
 

@@ -28,8 +28,8 @@ undocumented = ["azo-sys/undocumented"]
 
 [dependencies]
 azo-sys = { path = "./azo-sys", version = "0.1.0" }
-windows-core = "0.62.2"
-windows-registry = "0.6.1"
+windows-core = "0.100.0"
+windows-registry = "0.100.0"
 
 [build-dependencies]
-windows-bindgen = "0.66.0"
+windows-bindgen = "0.100.0"

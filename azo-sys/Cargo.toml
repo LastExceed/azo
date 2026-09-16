@@ -15,5 +15,5 @@ default = []
 undocumented = []
 
 [dependencies]
-bitflags = "2.13.1"
-windows-core = "0.62.2"
+bitflags = "2.13.2"
+windows-core = "0.100.0"

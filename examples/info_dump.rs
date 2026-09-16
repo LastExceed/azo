@@ -7,7 +7,7 @@ fn main() {
 	let driver_metas = azo::get_drivers().unwrap();
 	for (driver_meta_index, driver_meta) in driver_metas.into_iter().enumerate() {		
 		println!("\n==================== driver #{driver_meta_index} ====================\n");
-		println!("description: {}"  , driver_meta.description);
+		println!("description: {:?}", driver_meta.description);
 		println!("clsid & iid: {:?}", driver_meta.clsid);
 		println!();
 		

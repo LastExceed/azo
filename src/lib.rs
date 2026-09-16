@@ -2,13 +2,9 @@ pub mod dto;
 pub mod future;
 pub mod utils;
 #[expect(
-    dead_code,
     non_snake_case,
     unreachable_pub,
-    unused_results,
-    clippy::nursery,
     clippy::pedantic,
-    clippy::style,
     clippy::restriction,
     clippy::blanket_clippy_restriction_lints, // false positive due to above
     reason = "generated"
@@ -28,7 +24,7 @@ use self::utils::com::cast_decoupled;
 use self::utils::*;
 
 use self::windows_bindings::{CLSCTX_SERVER, CoCreateInstance};
-pub use self::windows_bindings::{HWND, HANDLE, COINIT, COINIT_APARTMENTTHREADED};
+pub use self::windows_bindings::{HWND, COINIT, COINIT_APARTMENTTHREADED};
 pub use azo_sys as sys;
 
 pub type WinResult<T> = windows_core::Result<T>;
@@ -101,7 +97,7 @@ impl Driver {
         // Created as `IUnknown` because windows-rs binds this function in
         // a way where the IID is acquired from a trait-associated constant,
         // which is impossible to implement for `IIASIORedecl` (see its doc comment)
-        let i_unknown: IUnknown = unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER) }?;
+        let i_unknown: IUnknown = unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER as _) }?;
 
         // The aforementioned binding limitation also applies to `.cast()`.
         // Luckily, the underlying `.query()` is public, which enables the following work-around:
