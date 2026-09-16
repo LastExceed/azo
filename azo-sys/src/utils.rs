@@ -55,3 +55,24 @@ macro_rules! c_enum {
 		}
 	}
 }
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct I64Split {
+	pub hi: u32,
+	pub lo: u32
+}
+
+impl From<i64> for I64Split {
+	fn from(value: i64) -> Self {
+		Self {
+			hi: (value >> 32) as _,
+			lo: (value & 0xFFFFFFFF) as _
+		}
+	}
+}
+
+impl From<I64Split> for i64 {
+	fn from(I64Split { hi, lo }: I64Split) -> Self {
+		((hi as Self) << 32) | (lo as Self)
+	}
+}

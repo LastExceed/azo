@@ -245,9 +245,16 @@ impl Driver {
     }
 
 	pub fn sample_position(&self) -> Result<dto::SamplePosition> {
-        let mut sample_pos = dto::SamplePosition { position: 0, time_stamp: 0 };
-        let code = unsafe { self.0.get_sample_position(&raw mut sample_pos.position, &raw mut sample_pos.time_stamp) };
-        create_result(sample_pos, code)
+        let mut position   = sys::Samples  ::default();
+        let mut time_stamp = sys::TimeStamp::default();
+        let code = unsafe { self.0.get_sample_position(&raw mut position, &raw mut time_stamp) };
+        
+        let out = dto::SamplePosition {
+            position  : position  .into(),
+            time_stamp: time_stamp.into()
+        };
+
+        create_result(out, code)
     }
 
 	pub fn channel_info(&self, channel_id: dto::ChannelId) -> Result<dto::ChannelInfoResponse> {

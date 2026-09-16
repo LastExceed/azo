@@ -17,8 +17,8 @@ pub struct Latencies {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SamplePosition {
-    pub position: sys::Samples,
-    pub time_stamp: sys::TimeStamp
+    pub position  : i64,
+    pub time_stamp: i64
 }
 
 impl From<SamplePosition> for sys::Time {
@@ -27,8 +27,8 @@ impl From<SamplePosition> for sys::Time {
             _reserved: [0; 4],
             time_info: sys::TimeInfo {
                 speed          : Default::default(), // not marked valid
-                system_time    : pos.time_stamp,
-                sample_position: pos.position,
+                system_time    : pos.time_stamp.into(),
+                sample_position: pos.position  .into(),
                 sample_rate    : Default::default(), // not marked valid
                 flags          : sys::TimeInfoFlags::SYSTEM_TIME_VALID
                                | sys::TimeInfoFlags::SAMPLE_POSITION_VALID,

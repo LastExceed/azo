@@ -9,6 +9,8 @@ use std::{ffi::*, mem};
 use bitflags::bitflags;
 use windows_core::{interface, IUnknown, IUnknown_Vtbl};
 
+use self::utils::I64Split;
+
 /// Bizarrely, there is no IID assigned to the original `IASIO`, which means it is not actually a COM interface at all.
 /// Instead, each driver declares and implements an individual replica interface,
 /// re-using the CLSID of its implementation as the IID for the replica.
@@ -49,8 +51,8 @@ pub type ChannelGroupIndex = c_long;
 pub type ChannelIndex      = c_long;
 pub type ClockSourceIndex  = c_long;
 pub type NonNegativeI32    = c_long;
-pub type Samples    = i64;
-pub type TimeStamp  = i64;
+pub type Samples    = I64Split;
+pub type TimeStamp  = I64Split;
 pub type SampleRate = f64;
 
 #[repr(transparent)]
