@@ -2,7 +2,7 @@
 #![expect(clippy::unusual_byte_groupings, reason = "easter eggs")]
 
 #[macro_use]
-mod utils;
+pub mod utils;
 
 use std::{ffi::*, mem};
 use bitflags::bitflags;
