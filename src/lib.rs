@@ -106,6 +106,13 @@ impl Driver {
         .map(Self)
     }
     
+    /// # Safety
+    /// The caller retains the responsibility of keeping `raw`'s COM apartment alive
+    /// for as long as  the returned struct lives
+    pub const unsafe fn from_raw(raw: IIASIORedecl) -> Self {
+        Self(raw)
+    }
+    
     /// Exposes the underlying COM interface pointer
     #[must_use]
     pub const fn as_raw(&self) -> &IIASIORedecl {
