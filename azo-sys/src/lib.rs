@@ -7,6 +7,8 @@ pub mod utils;
 use std::{ffi::*, mem};
 use bitflags::bitflags;
 use windows_core::{interface, IUnknown};
+#[expect(unused_imports, reason = "linked in doc-comment")]
+use windows_core::HRESULT;
 
 use self::utils::I64Split;
 
@@ -14,7 +16,7 @@ use self::utils::I64Split;
 /// Instead, each driver declares and implements an individual replica interface,
 /// re-using the CLSID of its implementation as the IID for the replica.
 ///
-/// That, together with the complete absence of `HRESULT`s in all functions breaking any form of marshalling,
+/// That, together with the complete absence of [`HRESULT`] in all functions breaking any form of marshalling,
 /// is a horrible abuse of the COM system, and completely defeats the point of using it in the first place.
 /// 
 /// Since each driver's re-declaration is distinct, and the naming up to the respective developers, there is no correct answer to what the name of [`Self`] should be,
