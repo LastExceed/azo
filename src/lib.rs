@@ -22,9 +22,10 @@ use self::dto::Granularity;
 use self::future::Future;
 use self::utils::com::cast_decoupled;
 use self::utils::*;
-
 use self::windows_bindings::{CLSCTX_SERVER, CoCreateInstance};
+
 pub use self::windows_bindings::{HWND, COINIT, COINIT_APARTMENTTHREADED};
+pub use windows_core;
 pub use azo_sys as sys;
 
 pub type WinResult<T> = windows_core::Result<T>;
