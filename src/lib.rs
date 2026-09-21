@@ -92,8 +92,9 @@ unsafe impl Sync for Driver {}
 
 impl Driver {
     /// # Safety
-    /// Caller needs to ensure that COM is initialized on this thread,
-    /// and stays that way until this [`Driver`] got dropped
+    /// Caller needs to ensure that COM
+    /// * is initialized on this thread
+    /// * stays that way until this [`Driver`] got dropped
     pub unsafe fn new_unguarded(guid: &GUID) -> WinResult<Self> {
         // Created as `IUnknown` because windows-rs binds this function in
         // a way where the IID is acquired from a trait-associated constant,
