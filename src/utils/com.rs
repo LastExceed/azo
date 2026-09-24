@@ -1,7 +1,7 @@
 use std::ops::Deref;
-
-use crate::windows_bindings::*;
-use super::*;
+use windows_core::{GUID, Interface};
+use crate::utils::PhantomUnSend;
+use crate::win::*;
 
 /// This type ensures correct pairing of calls to [`CoInitializeEx`] and [`CoUninitialize`]
 #[derive(Debug)]

@@ -1,17 +1,7 @@
 pub mod dto;
 pub mod future;
 pub mod utils;
-#[expect(
-    non_snake_case,
-    unreachable_pub,
-    clippy::pedantic,
-    clippy::restriction,
-    clippy::blanket_clippy_restriction_lints, // false positive due to above
-    reason = "generated"
-)]
-mod windows_bindings {
-    include!(concat!(env!("OUT_DIR"), "/windows_bindgen_out.rs"));
-}
+mod win;
 
 use std::num::NonZeroI32;
 use std::{fmt, mem, ptr};
