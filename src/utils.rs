@@ -1,9 +1,5 @@
-pub mod com;
-
-use std::ffi::*;
 use std::marker::PhantomData;
-use windows_core::Interface;
-use super::*;
+use super::{CStr, CString, Error, NonZeroI32, Result, ResultCode};
 
 /// Can't use [`From`] / [`Into`] because of the orphan rule
 pub(crate) fn create_result<T>(ok_value: T, code: ResultCode) -> Result<T> {
@@ -25,4 +21,4 @@ pub(crate) fn cstring_from_bytes_until_nul(buffer: &[u8]) -> CString {
 }
 
 /// workaround until `#![feature(negative_impls)]` gets stabilized
-type PhantomUnSend = PhantomData<*const ()>;
+pub(crate) type PhantomUnSend = PhantomData<*const ()>;

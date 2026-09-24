@@ -14,7 +14,7 @@ use self::utils::com::cast_decoupled;
 use self::utils::*;
 use self::windows_bindings::{CLSCTX_SERVER, CoCreateInstance};
 
-pub use self::windows_bindings::{HWND, COINIT, COINIT_APARTMENTTHREADED};
+pub use self::win::{HWND, COINIT, COINIT_APARTMENTTHREADED};
 pub use windows_core;
 pub use azo_sys as sys;
 
