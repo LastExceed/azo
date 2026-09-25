@@ -1,19 +1,28 @@
 use std::ffi::CStr;
 use azo::Driver;
+use azo::com;
 use azo::driver;
 use azo::dto::{ChannelId, Latencies};
 use azo::sys::*;
 use azo::future::*;
 
 fn main() {
+	#[cfg(feature = "host")]
+	let host = com::Host::new();
+
 	let driver_metas = driver::Metadata::enumerate().unwrap();
 	for (driver_meta_index, driver_meta) in driver_metas.into_iter().enumerate() {		
 		println!("\n==================== driver #{driver_meta_index} ====================\n");
 		println!("description: {:?}", driver_meta.description);
 		println!("clsid & iid: {:?}", driver_meta.clsid);
 		println!();
-		
-		let Ok(driver) = driver_meta.create_instance()
+
+		#[cfg(feature = "host")]
+		let create_result = host.create_driver(driver_meta.clsid);
+		#[cfg(not(feature = "host"))]
+		let create_result = driver_meta.create_instance();
+
+		let Ok(driver) = create_result
 		else {
 			println!("!! failed to create driver instance");
 			continue;
@@ -25,7 +34,7 @@ fn main() {
 	}
 }
 
-fn dump_info(driver: &driver::InstanceHandle) -> azo::Result<()> {
+fn dump_info(driver: &impl Driver) -> azo::Result<()> {
 	if !driver.init(None) {
 		println!("init failed - {:?}", driver.last_error());
 	}

@@ -4,6 +4,8 @@ pub mod dto;
 pub mod future;
 pub mod utils;
 mod win;
+#[cfg(feature = "host")]
+pub(crate) mod host;
 
 use std::num::NonZeroI32;
 use std::fmt;

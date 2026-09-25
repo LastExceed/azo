@@ -12,7 +12,16 @@ fn main() {
 		"CLSCTX_SERVER",
 		"E_POINTER",
 		"HWND",
-		"CoUninitialize"
+		"CoUninitialize",
+		"GetMessageW",
+		"DispatchMessageW",
+		"S_OK",
+		"PostThreadMessageW",
+		"GetThreadId",
+		"WM_USER",
+		"ERROR_INVALID_THREAD_ID",
+		"ERROR_NOT_ENOUGH_QUOTA",
+		"WM_QUIT"
 	])
 	.flat()
 	.dead_code()

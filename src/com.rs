@@ -2,6 +2,8 @@ use std::ops::Deref;
 use windows_core::{GUID, Interface};
 use crate::utils::PhantomUnSend;
 use crate::win::*;
+#[cfg(feature = "host")]
+pub use crate::host::Host;
 
 /// This type ensures correct pairing of calls to [`CoInitializeEx`] and [`CoUninitialize`]
 #[derive(Debug)]

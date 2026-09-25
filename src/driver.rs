@@ -8,6 +8,8 @@ use crate::future::Future;
 use crate::utils::*;
 use sys::IIASIORedecl;
 use windows_core::{GUID, HSTRING, IUnknown};
+#[cfg(feature = "host")]
+pub use crate::host::Proxy;
 
 /// Metadata of an ASIO driver, retrieved from the system registry via [`get_drivers`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
