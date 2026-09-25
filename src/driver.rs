@@ -1,0 +1,280 @@
+use std::{mem, ptr};
+use std::ffi::{CString, c_long, c_void};
+use std::num::NonZeroI32;
+use crate::*;
+use crate::com::cast_decoupled;
+use crate::dto::Granularity;
+use crate::future::Future;
+use crate::utils::*;
+use sys::IIASIORedecl;
+use windows_core::{GUID, HSTRING, IUnknown};
+
+/// Metadata of an ASIO driver, retrieved from the system registry via [`get_drivers`]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Metadata {
+	pub clsid: GUID,
+	pub description: HSTRING,
+}
+
+impl Metadata {
+	/// Gathers the metadata of all ASIO drivers currently registered in the system.
+	/// 
+	/// This is the "starting point" of this library.
+	/// 
+	/// Registry entries which can't be read are skipped, so that a single
+	/// malformed entry doesn't hide all other drivers.
+	pub fn enumerate() -> WinResult<Vec<Self>> {
+		let software_key = windows_registry::LOCAL_MACHINE.open("SOFTWARE\\ASIO")?;
+			
+		let drivers =
+			software_key
+			.keys()?
+			.filter_map(|driver_key_name| {
+				let driver_key = software_key.open(&driver_key_name).ok()?;
+				Self::from_registry(&driver_key).ok()
+			})
+			.collect();
+		
+		Ok(drivers)
+	}
+	
+	fn from_registry(key: &windows_registry::Key) -> WinResult<Self> {
+		let clsid =
+			key
+			.get_string("clsid")?
+			.trim_matches(['{', '}'])
+			.try_into()?;
+		
+		let description =
+			key
+			.get_hstring("description")?;
+		
+		Ok(Self { clsid, description })
+	}
+	
+	pub fn create_instance(&self) -> WinResult<com::InitGuard<InstanceHandle>> {
+		let empty_guard = com::InitGuard::new(COINIT_APARTMENTTHREADED)?; // this initializes COM
+		
+		let driver = unsafe { InstanceHandle::new_unguarded(&self.clsid) }?;
+		
+		let populated_guard = empty_guard.map(|()| driver);
+		Ok(populated_guard)
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstanceHandle(IIASIORedecl);
+
+impl InstanceHandle {
+	/// # Safety
+	/// Caller needs to ensure that COM
+	/// * is initialized on this thread
+	/// * stays that way until this [`Driver`] got dropped
+	pub unsafe fn new_unguarded(guid: &GUID) -> WinResult<Self> {
+		// Created as `IUnknown` because windows-rs binds this function in
+		// a way where the IID is acquired from a trait-associated constant,
+		// which is impossible to implement for `IIASIORedecl` (see its doc comment)
+		let i_unknown: IUnknown = unsafe { win::CoCreateInstance(guid, None, win::CLSCTX_SERVER as _) }?;
+
+		// The aforementioned binding limitation also applies to `.cast()`.
+		// Luckily, the underlying `.query()` is public, which enables the following work-around:
+		unsafe { cast_decoupled::<IIASIORedecl>(&i_unknown, guid) }
+		.map(Self)
+	}
+	
+	/// # Safety
+	/// The caller retains the responsibility of keeping `raw`'s COM apartment alive
+	/// for as long as  the returned struct lives
+	#[must_use]
+	pub const unsafe fn from_raw(raw: IIASIORedecl) -> Self {
+		Self(raw)
+	}
+	
+	/// Exposes the underlying COM interface pointer
+	#[must_use]
+	pub const fn as_raw(&self) -> &IIASIORedecl {
+		&self.0
+	}
+}
+
+impl Driver for InstanceHandle {    
+	fn init(&self, main_window_handle: Option<HWND>) -> bool {
+		let sys_ref = main_window_handle.unwrap_or_default(); 
+
+		unsafe { self.0.init(sys_ref.0) }
+		.try_into()
+		.unwrap_or(false)
+	}
+
+	fn name(&self) -> CString {
+		let mut buf = [0_u8; 32];
+		unsafe { self.0.get_driver_name(buf.as_mut_ptr()); }
+		cstring_from_bytes_until_nul(&buf)
+	}
+
+	fn version(&self) -> sys::DriverVersion {
+		unsafe { self.0.get_driver_version() }
+	}
+
+	fn last_error(&self) -> CString {
+		let mut buf = [0_u8; 124];
+		unsafe { self.0.get_error_message(buf.as_mut_ptr()); }
+		cstring_from_bytes_until_nul(&buf)
+	}
+	
+	fn start(&self) -> crate::Result<()> {
+		let code = unsafe { self.0.start() };
+		create_result((), code)
+	}
+	fn stop(&self) -> crate::Result<()> {
+		let code = unsafe { self.0.stop() };
+		create_result((), code)
+	}
+
+	fn channel_counts(&self) -> crate::Result<dto::ChannelCounts> {
+		let mut counts = dto::ChannelCounts { in_: 0, out: 0 };
+		let code = unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) };
+		create_result(counts, code)
+	}
+
+	fn latencies(&self) -> crate::Result<dto::Latencies> {
+		let mut latencies = dto::Latencies { in_: 0, out: 0 };
+		let code = unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) };
+		create_result(latencies, code)
+	}
+
+	fn buffer_size(&self) -> crate::Result<dto::BufferSize> {
+		let mut min         = -1;
+		let mut max         = -2;
+		let mut preferred   = -3;
+		let mut granularity = -4;
+		let code = unsafe { self.0.get_buffer_size(&raw mut min, &raw mut max, &raw mut preferred, &raw mut granularity) };
+		create_result((), code)?;
+
+		let buffer_size =
+			dto::BufferSize {
+				min,
+				max,
+				preferred,
+				granularity: NonZeroI32::new(granularity).map(Granularity::from)
+			};
+
+		Ok(buffer_size)
+	}
+
+	fn can_sample_rate(&self, sample_rate: sys::SampleRate) -> crate::Result<()> {
+		let code = unsafe { self.0.can_sample_rate(sample_rate) };
+		create_result((), code)
+	}
+	
+	fn get_sample_rate(&self) -> crate::Result<sys::SampleRate> {
+		let mut sample_rate = f64::NAN;
+		let code = unsafe { self.0.get_sample_rate(&raw mut sample_rate) };
+		create_result(sample_rate, code)
+	}
+
+	fn set_sample_rate(&self, sample_rate: sys::SampleRate) -> crate::Result<()> {
+		let code = unsafe { self.0.set_sample_rate(sample_rate) };
+		create_result((), code)
+	}
+
+	#[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
+	fn clock_sources(&self) -> crate::Result<Vec<sys::ClockSource>> {
+		let mut count = 1;
+		let mut first = unsafe { mem::zeroed() };
+		
+		let code = unsafe { self.0.get_clock_sources(&raw mut first, &raw mut count) };
+		create_result((), code)?;
+	
+		match count {
+			0   => Ok(vec![]),
+			1   => Ok(vec![first]),
+			2.. => {
+				let mut all = vec![unsafe { mem::zeroed() }; count as _];
+				let code2 = unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count) };
+				create_result(all, code2)
+			}
+			neg => panic!("driver reported negative number of clock sources ({neg})")
+		}
+	}
+
+	/// Selects a [`ClockSource`](sys::ClockSource), as enumerated via [`.clock_sources()`](Self::clock_sources)
+	fn set_clock_source(&self, clock_source: sys::ClockSourceIndex) -> crate::Result<()> {
+		let code = unsafe { self.0.set_clock_source(clock_source) };
+		create_result((), code)
+	}
+
+	fn sample_position(&self) -> crate::Result<dto::SamplePosition> {
+		let mut position   = sys::Samples  ::default();
+		let mut time_stamp = sys::TimeStamp::default();
+		let code = unsafe { self.0.get_sample_position(&raw mut position, &raw mut time_stamp) };
+		
+		let out = dto::SamplePosition {
+			position  : position  .into(),
+			time_stamp: time_stamp.into()
+		};
+
+		create_result(out, code)
+	}
+
+	fn channel_info(&self, channel_id: dto::ChannelId) -> crate::Result<dto::ChannelInfoResponse> {
+		let mut info =
+			sys::ChannelInfo {
+				channel: channel_id.index,
+				is_input: channel_id.input.into(),
+				..unsafe { mem::zeroed() }
+			};
+		let code = unsafe { self.0.get_channel_info(&raw mut info) };
+		create_result(info.into(), code)
+	}
+
+	unsafe fn create_buffers(
+		&self,
+		channels: impl IntoIterator<Item=dto::ChannelId>,
+		buffer_size: c_long,
+		callbacks: *const sys::Callbacks
+	) -> crate::Result<impl Iterator<Item=[*mut c_void; 2]>> {
+		let mut infos =
+			channels
+			.into_iter()
+			.map(|dto::ChannelId { input, index }|
+				sys::BufferInfo {
+				    is_input: input.into(),
+				    channel_num: index,
+				    buffers: [ptr::null_mut(); 2]
+				}
+			)
+			.collect::<Vec<_>>();
+		
+		let code = unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) };
+		let buffers =
+			infos
+			.into_iter()
+			.map(|info| info.buffers);
+
+		create_result(buffers, code)
+	}
+
+	fn dispose_buffers(&self) -> crate::Result<()> {
+		let code = unsafe { self.0.dispose_buffers() };
+		create_result((), code)
+	}
+
+	fn open_control_panel(&self) -> crate::Result<()> {
+		let code = unsafe { self.0.control_panel() };
+		create_result((), code)
+	}
+
+	fn future<T: Future>(&self, param: &mut T::Param) -> crate::Result<()> {
+		let selector = T::SELECTOR;
+		let opt = ptr::from_mut(param).cast();
+		
+		let code = unsafe { self.0.future(selector, opt) };
+		create_result((), code)
+	}
+	
+	fn output_ready(&self) -> crate::Result<()> {
+		let code = unsafe { self.0.output_ready() };
+		create_result((), code)
+	}
+}

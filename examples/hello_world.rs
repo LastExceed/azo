@@ -1,5 +1,7 @@
+use azo::*;
+
 fn main() {
-	let all = azo::get_drivers().unwrap();
+	let all = driver::Metadata::enumerate().unwrap();
 	let driver = all[0].create_instance().unwrap();
 
 	assert!(driver.init(None), "driver failed to initialize");

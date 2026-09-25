@@ -5,13 +5,14 @@ use std::sync::mpsc::TrySendError;
 use std::{iter, slice};
 use std::sync::mpsc;
 use std::sync::OnceLock;
+use azo::{driver, Driver};
 use azo::dto::ChannelId;
 use azo::sys::*;
 
 static SENDER: OnceLock<mpsc::SyncSender<c_long>> = OnceLock::new();
 
 fn main() {
-	let all = azo::get_drivers().unwrap();
+	let all = driver::Metadata::enumerate().unwrap();
 	let driver = all[0].create_instance().unwrap();
 
 	if let Err(error) = play_sine(&driver) {
@@ -25,7 +26,7 @@ fn main() {
 	clippy::infinite_loop,
 	reason = "simplicity"
 )]
-fn play_sine(driver: &azo::Driver) -> azo::Result<()> {
+fn play_sine(driver: &driver::InstanceHandle) -> azo::Result<()> {
 	let (sender, receiver) = mpsc::sync_channel::<c_long>(2);
 	SENDER.set(sender).unwrap();
 

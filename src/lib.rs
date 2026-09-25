@@ -1,18 +1,15 @@
+pub mod com;
+pub mod driver;
 pub mod dto;
 pub mod future;
 pub mod utils;
 mod win;
 
 use std::num::NonZeroI32;
-use std::{fmt, mem, ptr};
+use std::fmt;
 use std::ffi::*;
-use sys::{ResultCode, IIASIORedecl};
-use windows_core::{GUID, HSTRING, IUnknown};
-use self::dto::Granularity;
+use sys::ResultCode;
 use self::future::Future;
-use self::utils::com::cast_decoupled;
-use self::utils::*;
-use self::windows_bindings::{CLSCTX_SERVER, CoCreateInstance};
 
 pub use self::win::{HWND, COINIT, COINIT_APARTMENTTHREADED};
 pub use windows_core;
@@ -20,320 +17,97 @@ pub use azo_sys as sys;
 
 pub type WinResult<T> = windows_core::Result<T>;
 
-/// Gathers the metadata of all ASIO drivers currently registered in the system.
-/// 
-/// This is the "starting point" of this library.
-/// 
-/// Registry entries which can't be read are skipped, so that a single
-/// malformed entry doesn't hide all other drivers.
-pub fn get_drivers() -> WinResult<Vec<DriverMetadata>> {
-    let software_key = windows_registry::LOCAL_MACHINE.open("SOFTWARE\\ASIO")?;
-        
-    let drivers =
-        software_key
-        .keys()?
-        .filter_map(|driver_key_name| {
-            let driver_key = software_key.open(&driver_key_name).ok()?;
-            DriverMetadata::from_registry(&driver_key).ok()
-        })
-        .collect();
-    
-    Ok(drivers)
-}
-
-/// Metadata of an ASIO driver, retrieved from the system registry via [`get_drivers`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct DriverMetadata {
-    pub clsid: GUID,
-    pub description: HSTRING,
-}
-
-impl DriverMetadata {
-    fn from_registry(key: &windows_registry::Key) -> WinResult<Self> {
-        let clsid =
-            key
-            .get_string("clsid")?
-            .trim_matches(['{', '}'])
-            .try_into()?;
-        
-        let description =
-            key
-            .get_hstring("description")?;
-        
-        Ok(Self { clsid, description })
-    }
-    
-    pub fn create_instance(&self) -> WinResult<com::InitGuard<Driver>> {
-        let empty_guard = com::InitGuard::new(COINIT_APARTMENTTHREADED)?; // this initializes COM
-        
-        let driver = unsafe { Driver::new_unguarded(&self.clsid) }?;
-        
-        let populated_guard = empty_guard.map(|()| driver);
-        Ok(populated_guard)
-    }
-}
-
-#[derive(Debug)]
-pub struct Driver(IIASIORedecl);
-
-// Can't use marshaling anyway, so might as well
-unsafe impl Send for Driver {}
-unsafe impl Sync for Driver {}
-
-impl Driver {
-    /// # Safety
-    /// Caller needs to ensure that COM
-    /// * is initialized on this thread
-    /// * stays that way until this [`Driver`] got dropped
-    pub unsafe fn new_unguarded(guid: &GUID) -> WinResult<Self> {
-        // Created as `IUnknown` because windows-rs binds this function in
-        // a way where the IID is acquired from a trait-associated constant,
-        // which is impossible to implement for `IIASIORedecl` (see its doc comment)
-        let i_unknown: IUnknown = unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER as _) }?;
-
-        // The aforementioned binding limitation also applies to `.cast()`.
-        // Luckily, the underlying `.query()` is public, which enables the following work-around:
-        unsafe { cast_decoupled::<IIASIORedecl>(&i_unknown, guid) }
-        .map(Self)
-    }
-    
-    /// # Safety
-    /// The caller retains the responsibility of keeping `raw`'s COM apartment alive
-    /// for as long as  the returned struct lives
-    pub const unsafe fn from_raw(raw: IIASIORedecl) -> Self {
-        Self(raw)
-    }
-    
-    /// Exposes the underlying COM interface pointer
-    #[must_use]
-    pub const fn as_raw(&self) -> &IIASIORedecl {
-        &self.0
-    }
-    
-    /// The spec unfortunately does not elaborate on the purpose of the parameter.
-    #[must_use]
-    pub fn init(&self, main_window_handle: Option<HWND>) -> bool {
-        let sys_ref = main_window_handle.unwrap_or_default(); 
-
-        unsafe { self.0.init(sys_ref.0) }
-        .try_into()
-        .unwrap_or(false)
-    }
-    
-    /// Usually (but not necessarily) the same as [`DriverMetadata::description`].
-    #[must_use]
-    pub fn name(&self) -> CString {
-        let mut buf = [0_u8; 32];
-        unsafe { self.0.get_driver_name(buf.as_mut_ptr()); }
-        cstring_from_bytes_until_nul(&buf)
-    }
-
-    /// Intended to be the major ASIO version (`2` since the release of ASIO 2.0 in 1999),
-    /// but technically allowed to be higher by spec, and many report their own (independent) version this way.
-    #[must_use]
-    pub fn version(&self) -> sys::DriverVersion {
-        unsafe { self.0.get_driver_version() }
-    }
-
-    /// Retrieves a message associated with the recentmost error.
-    #[must_use]
-    pub fn last_error(&self) -> CString {
-        let mut buf = [0_u8; 124];
-        unsafe { self.0.get_error_message(buf.as_mut_ptr()); }
-        cstring_from_bytes_until_nul(&buf)
-    }
-
-    /// Drivers typically invoke the [`buffer_switch`](sys::Callbacks::buffer_switch) / [`buffer_switch_time_info`](sys::Callbacks::buffer_switch_time_info)
-    /// callback 1+ times during (or immediately after) this function call to prime the output buffer(s).
-    pub fn start(&self) -> Result<()> {
-        let code = unsafe { self.0.start() };
-        create_result((), code)
-    }
-    
-    /// Halts the streaming.<br>
-    /// The driver remains ready to resume via [`.start()`](Self::start).
-    pub fn stop(&self) -> Result<()> {
-        let code = unsafe { self.0.stop() };
-        create_result((), code)
-    }
-
-    /// Returns the number of channels in each direction.
-	pub fn channel_counts(&self) -> Result<dto::ChannelCounts> {
-        let mut counts = dto::ChannelCounts { in_: 0, out: 0 };
-        let code = unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) };
-        create_result(counts, code)
-    }
-
-    /// Accounts for buffer size, assuming [`BufferSize::preferred`](dto::BufferSize::preferred)
-    /// when called before [`.create_buffers()`](Self::create_buffers).
-    pub fn latencies(&self) -> Result<dto::Latencies> {
-        let mut latencies = dto::Latencies { in_: 0, out: 0 };
-        let code = unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) };
-        create_result(latencies, code)
-    }
-
-    /// Retrieves buffer size(s) supported by the driver.<br>
-    /// These can depend on the current sample rate.
-    pub fn buffer_size(&self) -> Result<dto::BufferSize> {
-        let mut min         = -1;
-        let mut max         = -2;
-        let mut preferred   = -3;
-        let mut granularity = -4;
-        let code = unsafe { self.0.get_buffer_size(&raw mut min, &raw mut max, &raw mut preferred, &raw mut granularity) };
-        create_result((), code)?;
-
-        let buffer_size =
-            dto::BufferSize {
-                min,
-                max,
-                preferred,
-                granularity: NonZeroI32::new(granularity).map(Granularity::from)
-            };
-
-        Ok(buffer_size)
-    }
-
-    /// Checks whether the specified `sample_rate` is supported.
-	pub fn can_sample_rate(&self, sample_rate: sys::SampleRate) -> Result<()> {
-        let code = unsafe { self.0.can_sample_rate(sample_rate) };
-        create_result((), code)
-    }
-    
-    /// Returns the current sample rate.
-    pub fn get_sample_rate(&self) -> Result<sys::SampleRate> {
-        let mut sample_rate = f64::NAN;
-        let code = unsafe { self.0.get_sample_rate(&raw mut sample_rate) };
-        create_result(sample_rate, code)
-    }
-    
-    /// 0 = external sync
-    pub fn set_sample_rate(&self, sample_rate: sys::SampleRate) -> Result<()> {
-        let code = unsafe { self.0.set_sample_rate(sample_rate) };
-        create_result((), code)
-    }
-
-    /// Retrieves a list of all clock sources available to this driver.
-    #[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
-	pub fn clock_sources(&self) -> Result<Vec<sys::ClockSource>> {
-        let mut count = 1;
-        let mut first = unsafe { mem::zeroed() };
-        
-        let code = unsafe { self.0.get_clock_sources(&raw mut first, &raw mut count) };
-        create_result((), code)?;
-    
-        match count {
-            0   => Ok(vec![]),
-            1   => Ok(vec![first]),
-            2.. => {
-                let mut all = vec![unsafe { mem::zeroed() }; count as _];
-                let code2 = unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count) };
-                create_result(all, code2)
-            }
-            neg => panic!("driver reported negative number of clock sources ({neg})")
-        }
-    }
-
-    /// Selects a [`ClockSource`](sys::ClockSource), as enumerated via [`.clock_sources()`](Self::clock_sources)
-	pub fn set_clock_source(&self, clock_source: sys::ClockSourceIndex) -> Result<()> {
-        let code = unsafe { self.0.set_clock_source(clock_source) };
-        create_result((), code)
-    }
-
-	pub fn sample_position(&self) -> Result<dto::SamplePosition> {
-        let mut position   = sys::Samples  ::default();
-        let mut time_stamp = sys::TimeStamp::default();
-        let code = unsafe { self.0.get_sample_position(&raw mut position, &raw mut time_stamp) };
-        
-        let out = dto::SamplePosition {
-            position  : position  .into(),
-            time_stamp: time_stamp.into()
-        };
-
-        create_result(out, code)
-    }
-
-	pub fn channel_info(&self, channel_id: dto::ChannelId) -> Result<dto::ChannelInfoResponse> {
-        let mut info =
-            sys::ChannelInfo {
-                channel: channel_id.index,
-                is_input: channel_id.input.into(),
-                ..unsafe { mem::zeroed() }
-            };
-        let code = unsafe { self.0.get_channel_info(&raw mut info) };
-        create_result(info.into(), code)
-    }
-
-    /// # Safety
-    /// * `callbacks` must outlive the created buffers.
-    /// * Derefs of the returned buffer pointers must not.
-    /// # Remarks
-    /// Providing safe abstractions for this function is very difficult to do without getting highly opinionated,
-    /// so it will remain `unsafe` for the time being. (Help wanted!)
-	pub unsafe fn create_buffers(
-        &self,
-        channels: impl IntoIterator<Item=dto::ChannelId>,
-        buffer_size: c_long,
-        callbacks: *const sys::Callbacks
-    ) -> Result<impl Iterator<Item=[*mut c_void; 2]>> {
-        let mut infos =
-            channels
-            .into_iter()
-            .map(|dto::ChannelId { input, index }|
-                sys::BufferInfo {
-                    is_input: input.into(),
-                    channel_num: index,
-                    buffers: [ptr::null_mut(); 2]
-                }
-            )
-            .collect::<Vec<_>>();
-        
-        let code = unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) };
-        let buffers =
-            infos
-            .into_iter()
-            .map(|info| info.buffers);
-
-        create_result(buffers, code)
-    }
-
-	pub fn dispose_all_buffers(&self) -> Result<()> {
-        let code = unsafe { self.0.dispose_buffers() };
-        create_result((), code)
-    }
-
-    /// Tells the driver to open its GUI
-    pub fn open_control_panel(&self) -> Result<()> {
-        let code = unsafe { self.0.control_panel() };
-        create_result((), code)
-    }
-
-    /// A very unfortunate name. 
-    /// This function actually has nothing to do with async code,
-    /// it merely provides a mechanism for extending ASIO in the future.
-    pub fn future<T: Future>(&self, param: &mut T::Param) -> Result<()> {
-        let selector = T::SELECTOR;
-        let opt = ptr::from_mut(param).cast();
-        
-        let code = unsafe { self.0.future(selector, opt) };
-        create_result((), code)
-    }
+pub trait Driver {
+	/// The spec unfortunately does not elaborate on the purpose of the parameter.
+	#[must_use]
+	fn init(&self, window_handle: Option<HWND>) -> bool;
+	/// Usually (but not necessarily) the same as [`DriverMetadata::description`].
+	#[must_use]
+	fn name(&self) -> CString;
 	
-    /// Tells the driver that the host is done processing output buffers.
-    /// 
-    /// This is *not* implicitly inferred from the return of [`Callbacks::buffer_switch`] / [`Callbacks::buffer_switch_time_info`],
-    /// because it might have been called by a thread that doesn't allow processing within the callback.
-    /// 
-    /// # Caveats
-    /// Devices without hardware DSP and no further internal buffering
+	/// Intended to be the major ASIO version (`2` since the release of ASIO 2.0 in 1999),
+	/// but technically allowed to be higher by spec, and many report their own (independent) version this way.
+	#[must_use]
+	fn version(&self) -> sys::DriverVersion;
+	
+	/// Retrieves a message associated with the recentmost error.
+	#[must_use]
+	fn last_error(&self) -> CString;
+	
+	/// Drivers typically invoke the [`buffer_switch`](sys::Callbacks::buffer_switch) / [`buffer_switch_time_info`](sys::Callbacks::buffer_switch_time_info)
+	/// callback 1+ times during (or immediately after) this function call to prime the output buffer(s).
+	fn start(&self) -> crate::Result<()>;
+	
+	/// Halts the streaming.<br>
+	/// The driver remains ready to resume via [`.start()`](Self::start).
+	fn stop(&self) -> crate::Result<()>;
+	
+	/// Returns the number of channels in each direction.
+	fn channel_counts(&self) -> crate::Result<dto::ChannelCounts>;
+	
+	/// Accounts for buffer size, assuming [`BufferSize::preferred`](dto::BufferSize::preferred)
+	/// when called before [`.create_buffers()`](Self::create_buffers).
+	fn latencies(&self) -> crate::Result<dto::Latencies>;
+	
+	/// Retrieves buffer size(s) supported by the driver.<br>
+	/// These can depend on the current sample rate.
+	fn buffer_size(&self) -> crate::Result<dto::BufferSize>;
+	
+	/// Checks whether the specified `sample_rate` is supported.
+	fn can_sample_rate(&self, sample_rate: sys::SampleRate) -> crate::Result<()>;
+	
+	/// Returns the current sample rate.
+	fn get_sample_rate(&self) -> crate::Result<sys::SampleRate>;
+		
+	/// 0 = external sync
+	fn set_sample_rate(&self, sample_rate: sys::SampleRate) -> crate::Result<()>;
+	
+	/// Retrieves a list of all clock sources available to this driver.
+	fn clock_sources(&self) -> crate::Result<Vec<sys::ClockSource>>;
+	
+	/// Selects a [`ClockSource`](sys::ClockSource), as enumerated via [`.clock_sources()`](Self::clock_sources)
+	fn set_clock_source(&self, clock_source: sys::ClockSourceIndex) -> crate::Result<()>;
+	
+	/// Tells the driver to open its GUI
+	fn sample_position(&self) -> crate::Result<dto::SamplePosition>;
+	fn channel_info(&self, channel_id: dto::ChannelId) -> crate::Result<dto::ChannelInfoResponse>;
+	fn dispose_buffers(&self) -> crate::Result<()>;
+	
+	/// Tells the driver to open its GUI
+	fn open_control_panel(&self) -> crate::Result<()>;
+	
+	/// Tells the driver that the host is done processing output buffers.
+	/// 
+	/// This is *not* implicitly inferred from the return of [`Callbacks::buffer_switch`] / [`Callbacks::buffer_switch_time_info`],
+	/// because it might have been called by a thread that doesn't allow processing within the callback.
+	/// 
+	/// # Caveats
+	/// Devices without hardware DSP and no further internal buffering
 	/// have no use for this signal, so their drivers might not support it,
-    /// and instead return [`ResultCode::NOT_PRESENT`].
-    /// This is not fatal, it just means that calls to this function can (and should) be skipped.
-    /// Take care not to "error out" unnecessarily in this case.
-    pub fn output_ready(&self) -> Result<()> {
-        let code = unsafe { self.0.output_ready() };
-        create_result((), code)
-    }
+	/// and instead return [`ResultCode::NOT_PRESENT`].
+	/// This is not fatal, it just means that calls to this function can (and should) be skipped.
+	/// Take care not to "error out" unnecessarily in this case.
+	fn output_ready(&self) -> crate::Result<()>;
+	
+	/// # Safety
+	/// * `callbacks` must outlive the created buffers.
+	/// * Derefs of the returned buffer pointers must not.
+	/// # Remarks
+	/// This function is kept C-style because providing safe abstractions for it
+	/// is very difficult to do without getting highly opinionated. (Help wanted!)
+	unsafe fn create_buffers(
+		&self,
+		channels: impl IntoIterator<Item=dto::ChannelId>,
+		buffer_size: c_long,
+		callbacks: *const sys::Callbacks
+	) -> crate::Result<impl Iterator<Item=[*mut c_void; 2]>>;
+	
+	/// A very unfortunate name. 
+	/// This function actually has nothing to do with async code,
+	/// it merely provides a mechanism for extending ASIO in the future.
+	fn future<T: Future>(&self, param: &mut T::Param) -> crate::Result<()>;
 }
+
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Error(NonZeroI32);
