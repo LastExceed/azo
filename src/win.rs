@@ -1,8 +1,11 @@
 #![expect(
     non_snake_case,
-    clippy::pedantic,
-    clippy::restriction,
-    clippy::blanket_clippy_restriction_lints, // false positive due to above
+    trivial_casts,
+    clippy::absolute_paths,
+    clippy::missing_safety_doc,
+    clippy::must_use_candidate,
+    clippy::borrow_as_ptr,
+    clippy::ptr_as_ptr,
     reason = "generated"
 )]
 
