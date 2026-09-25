@@ -10,7 +10,7 @@ pub use crate::host::Host;
 pub struct InitGuard<T>(T, Dropper);
 
 impl InitGuard<()> {
-	pub fn new(coinit: COINIT) -> windows_core::Result<Self> {
+	pub(crate) fn new(coinit: COINIT) -> windows_core::Result<Self> {
         unsafe { CoInitializeEx(None, coinit as _) }.ok()?;
 		
 		Ok(Self((), Dropper::default()))

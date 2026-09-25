@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-#[cfg(feature = "host")]
-use std::ffi::CString;
-use std::ffi::{c_long, c_void};
+use std::ffi::{CString, c_long, c_void};
 use std::fmt::Debug;
 use std::os::windows::io::AsRawHandle;
 use std::sync::Arc;
@@ -9,11 +7,10 @@ use std::{ptr, thread};
 use std::time::Duration;
 use tap::Pipe;
 use windows_core::{GUID, WIN32_ERROR};
+use crate::{Driver, dto, sys, win};
 use crate::driver::InstanceHandle;
-#[cfg(feature = "host")]
 use crate::future::Future;
 use crate::utils::create_result;
-use crate::{Driver, WinResult, dto, sys};
 use crate::win::*;
 
 const POST_MESSAGE_ERRORS: [WIN32_ERROR; 2] = [
@@ -46,9 +43,9 @@ impl Host {
 	
 	/// Creates an instance of a driver in this host's STA and returns a [`Proxy`] for interacting with that driver,
 	/// which can be freely shared between threads without restrictions.
-	pub fn create_driver(self: &Arc<Self>, guid: GUID) -> WinResult<Proxy> {
+	pub fn create_driver(self: &Arc<Self>, guid: GUID) -> win::Result<Proxy> {
 		self
-		.command_with_response::<WinResult<Token>>(Command::Create(guid))
+		.command_with_response::<win::Result<Token>>(Command::Create(guid))
 		.map(|token| Proxy { token, host: Arc::clone(self) })
 	}
 	
@@ -202,7 +199,7 @@ impl WorkerContext {
 		}
 	}
 	
-	fn create_driver(&mut self, guid: &GUID) -> WinResult<Token> {
+	fn create_driver(&mut self, guid: &GUID) -> win::Result<Token> {
 		let driver = unsafe { InstanceHandle::new_unguarded(guid) }?;
 		let token = self.create_token();
 		self.drivers.insert(token, driver);

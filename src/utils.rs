@@ -1,8 +1,12 @@
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
-use super::{CStr, CString, Error, NonZeroI32, Result, ResultCode};
+use std::num::NonZeroI32;
+use azo_sys::ResultCode;
+
+use crate::Error;
 
 /// Can't use [`From`] / [`Into`] because of the orphan rule
-pub(crate) fn create_result<T>(ok_value: T, code: ResultCode) -> Result<T> {
+pub(crate) fn create_result<T>(ok_value: T, code: ResultCode) -> crate::Result<T> {
     match code {
         ResultCode::OK |
         ResultCode::SUCCESS => Ok(ok_value),
