@@ -4,7 +4,7 @@ use std::{mem, ptr};
 use crate::{Driver, com, dto, sys, win};
 use crate::com::cast_decoupled;
 use crate::dto::Granularity;
-use crate::future::Future;
+use crate::future::AsioFuture;
 use crate::utils::*;
 use sys::IIASIORedecl;
 use windows_core::{GUID, HSTRING, IUnknown};
@@ -267,7 +267,7 @@ impl Driver for InstanceHandle {
 		create_result((), code)
 	}
 
-	fn future<T: Future>(&self, param: &mut T::Param) -> crate::Result<()> {
+	fn future<T: AsioFuture>(&self, param: &mut T::Param) -> crate::Result<()> {
 		let selector = T::SELECTOR;
 		let opt = ptr::from_mut(param).cast();
 		

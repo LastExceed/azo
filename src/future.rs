@@ -1,11 +1,10 @@
 use crate::sys::*;
 
-/// <div class="warning">
-/// 
-/// Not to be confused with [`std::future::Future`] !
-/// 
-/// </div>
-pub trait Future {
+/// This has nothing to do with [`Future`],
+/// ASIO just happens to have a concept of the same name.
+/// (ASIO pre-dates widespread adoption of the concurrency model)
+#[expect(clippy::module_name_repetitions, reason = "prefix added because std's Future is in the prelude")]
+pub trait AsioFuture {
 	const SELECTOR: FutureSelector;
 	type Param;
 }
@@ -16,7 +15,7 @@ macro_rules! Impl {
 			#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 			pub struct $name;
 			
-			impl Future for $name {
+			impl AsioFuture for $name {
 				const SELECTOR: FutureSelector = FutureSelector::$selector;
 				type Param = $param;
 			}

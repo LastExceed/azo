@@ -11,7 +11,7 @@ use std::num::NonZeroI32;
 use std::fmt;
 use std::ffi::*;
 use sys::ResultCode;
-use self::future::Future;
+use self::future::AsioFuture;
 
 pub use windows_core;
 pub use azo_sys as sys;
@@ -104,7 +104,7 @@ pub trait Driver {
 	/// A very unfortunate name. 
 	/// This function actually has nothing to do with async code,
 	/// it merely provides a mechanism for extending ASIO in the future.
-	fn future<T: Future>(&self, param: &mut T::Param) -> Result<()>;
+	fn future<T: AsioFuture>(&self, param: &mut T::Param) -> Result<()>;
 }
 
 

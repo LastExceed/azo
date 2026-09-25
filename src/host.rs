@@ -9,7 +9,7 @@ use tap::Pipe;
 use windows_core::{GUID, WIN32_ERROR};
 use crate::{Driver, dto, sys, win};
 use crate::driver::InstanceHandle;
-use crate::future::Future;
+use crate::future::AsioFuture;
 use crate::utils::create_result;
 use crate::win::*;
 
@@ -334,7 +334,7 @@ impl Driver for Proxy {
 		.map(Vec::into_iter)
 	}
 
-	fn future<T: Future>(&self, param: &mut T::Param) -> crate::Result<()> {
+	fn future<T: AsioFuture>(&self, param: &mut T::Param) -> crate::Result<()> {
 		self.call(Method::Future { selector: T::SELECTOR, opt: <*mut _>::cast(param) })
 	}
 }
