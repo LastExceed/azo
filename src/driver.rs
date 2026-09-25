@@ -1,7 +1,7 @@
 use std::ffi::{CString, c_long, c_void};
 use std::num::NonZeroI32;
 use std::{mem, ptr};
-use crate::{com, dto, sys, win};
+use crate::{WinResult, com, dto, sys, win};
 use crate::com::cast_decoupled;
 use crate::dto::Granularity;
 use crate::future::AsioFuture;
@@ -119,7 +119,7 @@ impl Metadata {
 	/// 
 	/// Registry entries which can't be read are skipped, so that a single
 	/// malformed entry doesn't hide all other drivers.
-	pub fn enumerate() -> win::Result<Vec<Self>> {
+	pub fn enumerate() -> WinResult<Vec<Self>> {
 		let software_key = windows_registry::LOCAL_MACHINE.open("SOFTWARE\\ASIO")?;
 			
 		let drivers =
@@ -134,7 +134,7 @@ impl Metadata {
 		Ok(drivers)
 	}
 	
-	fn from_registry(key: &windows_registry::Key) -> win::Result<Self> {
+	fn from_registry(key: &windows_registry::Key) -> WinResult<Self> {
 		let clsid =
 			key
 			.get_string("clsid")?
@@ -148,7 +148,7 @@ impl Metadata {
 		Ok(Self { clsid, description })
 	}
 	
-	pub fn create_instance(&self) -> win::Result<com::InitGuard<InstanceHandle>> {
+	pub fn create_instance(&self) -> WinResult<com::InitGuard<InstanceHandle>> {
 		let empty_guard = com::InitGuard::new(win::COINIT_APARTMENTTHREADED)?; // this initializes COM
 		
 		let driver = unsafe { InstanceHandle::new_unguarded(&self.clsid) }?;
@@ -166,7 +166,7 @@ impl InstanceHandle {
 	/// Caller needs to ensure that COM
 	/// * is initialized on this thread
 	/// * stays that way until this [`Driver`] got dropped
-	pub unsafe fn new_unguarded(guid: &GUID) -> win::Result<Self> {
+	pub unsafe fn new_unguarded(guid: &GUID) -> WinResult<Self> {
 		// Created as `IUnknown` because windows-rs binds this function in
 		// a way where the IID is acquired from a trait-associated constant,
 		// which is impossible to implement for `IIASIORedecl` (see its doc comment)

@@ -13,6 +13,7 @@ use sys::ResultCode;
 
 pub use windows_core;
 pub use azo_sys as sys;
+pub use win::HWND;
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Error(NonZeroI32);
@@ -42,3 +43,5 @@ impl std::error::Error for Error {}
 
 #[expect(clippy::absolute_paths, reason = "name collision")]
 pub type Result<T> = std::result::Result<T, Error>;
+
+pub type WinResult<T> = windows_core::Result<T>;
