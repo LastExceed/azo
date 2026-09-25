@@ -7,8 +7,8 @@ use std::{ptr, thread};
 use std::time::Duration;
 use tap::Pipe;
 use windows_core::{GUID, WIN32_ERROR};
-use crate::{Driver, dto, sys, win};
-use crate::driver::InstanceHandle;
+use crate::{dto, sys, win};
+use crate::driver::{Driver, InstanceHandle};
 use crate::future::AsioFuture;
 use crate::utils::create_result;
 use crate::win::*;
@@ -43,6 +43,7 @@ impl Host {
 	
 	/// Creates an instance of a driver in this host's STA and returns a [`Proxy`] for interacting with that driver,
 	/// which can be freely shared between threads without restrictions.
+	#[expect(unused_qualifications, reason = "clarity")]
 	pub fn create_driver(self: &Arc<Self>, guid: GUID) -> win::Result<Proxy> {
 		self
 		.command_with_response::<win::Result<Token>>(Command::Create(guid))
@@ -199,6 +200,7 @@ impl WorkerContext {
 		}
 	}
 	
+	#[expect(unused_qualifications, reason = "clarity")]
 	fn create_driver(&mut self, guid: &GUID) -> win::Result<Token> {
 		let driver = unsafe { InstanceHandle::new_unguarded(guid) }?;
 		let token = self.create_token();
