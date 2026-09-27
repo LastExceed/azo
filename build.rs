@@ -16,6 +16,7 @@ fn main() {
 		"GetMessageW",
 		"DispatchMessageW",
 		"S_OK",
+		"S_FALSE",
 		"PostThreadMessageW",
 		"GetThreadId",
 		"WM_USER",

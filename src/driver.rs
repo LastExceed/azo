@@ -1,20 +1,22 @@
 use std::ffi::{CString, c_long, c_void};
 use std::num::NonZeroI32;
 use std::{mem, ptr};
-use crate::{WinResult, com, dto, sys, win};
-use crate::com::cast_decoupled;
+use crate::{WinResult, dto, sys};
 use crate::dto::Granularity;
 use crate::future::AsioFuture;
-use crate::utils::*;
+use crate::utils::{cast_decoupled, create_result, cstring_from_bytes_until_nul};
+use crate::win::{CLSCTX_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize, HWND, S_FALSE};
 use sys::IIASIORedecl;
+use tap::Pipe;
 use windows_core::{GUID, HSTRING, IUnknown};
+
 #[cfg(feature = "host")]
-pub use crate::host::Proxy;
+pub use crate::host::{Proxy, ExfiltratedHandle};
 
 pub trait Driver {
 	/// The spec unfortunately does not elaborate on the purpose of the parameter.
 	#[must_use]
-	fn init(&self, window_handle: Option<win::HWND>) -> bool;
+	fn init(&self, window_handle: Option<HWND>) -> bool;
 
 	/// Usually (but not necessarily) the same as [`DriverMetadata::description`].
 	#[must_use]
@@ -114,11 +116,9 @@ pub struct Metadata {
 
 impl Metadata {
 	/// Gathers the metadata of all ASIO drivers currently registered in the system.
+	/// Malformed keys are skipped.
 	/// 
 	/// This is the "starting point" of this library.
-	/// 
-	/// Registry entries which can't be read are skipped, so that a single
-	/// malformed entry doesn't hide all other drivers.
 	pub fn enumerate() -> WinResult<Vec<Self>> {
 		let software_key = windows_registry::LOCAL_MACHINE.open("SOFTWARE\\ASIO")?;
 			
@@ -147,54 +147,116 @@ impl Metadata {
 		
 		Ok(Self { clsid, description })
 	}
+}
+
+/// A safe, [`Clone`]able handle to a driver instance.
+/// This type is ! [`Send`] because the driver instance lives in a single-threaded COM apartment.
+/// [`crate::utils::Host`] provides the necessary machinery to get around this limitation.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SafeHandle(UnsafeHandle);
+
+impl Clone for SafeHandle {
+	fn clone(&self) -> Self {
+		// increment the ref count
+		let hresult = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
+		assert_eq!(hresult, S_FALSE, "COM should be initialized as STA");
+		
+		Self(self.0.clone())
+	}
+}
+
+impl SafeHandle {
+	pub fn new(clsid: &GUID) -> WinResult<Self> {
+		let hresult = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
+		if !hresult.is_ok() {
+			return Err(hresult.into());
+		}
+		
+		// SAFETY:
+		// COM is now initialized, and gets uninitialized in the `Drop` implementation of `Self`
+		unsafe { UnsafeHandle::new(clsid) }?
+    	.pipe(Self)
+		.pipe(Ok)
+	}
 	
-	pub fn create_instance(&self) -> WinResult<com::InitGuard<InstanceHandle>> {
-		let empty_guard = com::InitGuard::new(win::COINIT_APARTMENTTHREADED)?; // this initializes COM
-		
-		let driver = unsafe { InstanceHandle::new_unguarded(&self.clsid) }?;
-		
-		let populated_guard = empty_guard.map(|()| driver);
-		Ok(populated_guard)
+	/// # Safety
+	/// The caller must ensure that the returned handle and derivatives do not outlive the driver instance.
+	#[must_use]
+	pub const unsafe fn as_unsafe(&self) -> &UnsafeHandle {
+		&self.0
+	}
+}
+
+impl Drop for SafeHandle {
+	fn drop(&mut self) {
+		unsafe { CoUninitialize(); }
+	}
+}
+
+// can't use Deref as that would provide access to its `Clone` implementation without ever having to commit to the API contract
+impl Driver for SafeHandle {
+	fn init              (&self, window_handle: Option<HWND>        ) -> bool                                    { self.0.init              (window_handle) }
+	fn name              (&self                                     ) -> CString                                 { self.0.name              (             ) }
+	fn version           (&self                                     ) -> sys::DriverVersion                      { self.0.version           (             ) }
+	fn last_error        (&self                                     ) -> CString                                 { self.0.last_error        (             ) }
+	fn start             (&self                                     ) -> crate::Result<()>                       { self.0.start             (             ) }
+	fn stop              (&self                                     ) -> crate::Result<()>                       { self.0.stop              (             ) }
+	fn channel_counts    (&self                                     ) -> crate::Result<dto::ChannelCounts>       { self.0.channel_counts    (             ) }
+	fn latencies         (&self                                     ) -> crate::Result<dto::Latencies>           { self.0.latencies         (             ) }
+	fn buffer_size       (&self                                     ) -> crate::Result<dto::BufferSize>          { self.0.buffer_size       (             ) }
+	fn can_sample_rate   (&self, sample_rate: sys::SampleRate       ) -> crate::Result<()>                       { self.0.can_sample_rate   (sample_rate  ) }
+	fn get_sample_rate   (&self                                     ) -> crate::Result<sys::SampleRate>          { self.0.get_sample_rate   (             ) }
+	fn set_sample_rate   (&self, sample_rate: sys::SampleRate       ) -> crate::Result<()>                       { self.0.set_sample_rate   (sample_rate  ) }
+	fn clock_sources     (&self                                     ) -> crate::Result<Vec<sys::ClockSource>>    { self.0.clock_sources     (             ) }
+	fn set_clock_source  (&self, clock_source: sys::ClockSourceIndex) -> crate::Result<()>                       { self.0.set_clock_source  (clock_source ) }
+	fn sample_position   (&self                                     ) -> crate::Result<dto::SamplePosition>      { self.0.sample_position   (             ) }
+	fn channel_info      (&self, channel_id: dto::ChannelId         ) -> crate::Result<dto::ChannelInfoResponse> { self.0.channel_info      (channel_id   ) }
+	fn dispose_buffers   (&self                                     ) -> crate::Result<()>                       { self.0.dispose_buffers   (             ) }
+	fn open_control_panel(&self                                     ) -> crate::Result<()>                       { self.0.open_control_panel(             ) }
+	fn output_ready      (&self                                     ) -> crate::Result<()>                       { self.0.output_ready      (             ) }
+	
+	unsafe fn create_buffers(
+		&self,
+		channels   : impl IntoIterator<Item=dto::ChannelId>,
+		buffer_size: c_long,
+		callbacks  : *const azo_sys::Callbacks
+	) -> crate::Result<impl Iterator<Item=[*mut c_void; 2]>> {
+		unsafe { self.0.create_buffers(channels, buffer_size, callbacks) }
+	}
+	
+	fn future<T: AsioFuture>(&self, param: &mut T::Param) -> crate::Result<()> {
+		self.0.future::<T>(param)
 	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InstanceHandle(IIASIORedecl);
+pub struct UnsafeHandle(pub IIASIORedecl);
 
-impl InstanceHandle {
+impl UnsafeHandle {
 	/// # Safety
-	/// Caller needs to ensure that COM
+	/// The caller must ensure that COM
 	/// * is initialized on this thread
-	/// * stays that way until this [`Driver`] got dropped
-	pub unsafe fn new_unguarded(guid: &GUID) -> WinResult<Self> {
+	/// * stays that way until this handle and all its clones got dropped
+	pub unsafe fn new(guid: &GUID) -> WinResult<Self> {
 		// Created as `IUnknown` because windows-rs binds this function in
 		// a way where the IID is acquired from a trait-associated constant,
 		// which is impossible to implement for `IIASIORedecl` (see its doc comment)
-		let i_unknown: IUnknown = unsafe { win::CoCreateInstance(guid, None, win::CLSCTX_SERVER as _) }?;
+		let i_unknown: IUnknown = unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER as _) }?;
 
 		// The aforementioned binding limitation also applies to `.cast()`.
 		// Luckily, the underlying `.query()` is public, which enables the following work-around:
 		unsafe { cast_decoupled::<IIASIORedecl>(&i_unknown, guid) }
 		.map(Self)
 	}
-	
-	/// # Safety
-	/// The caller retains the responsibility of keeping `raw`'s COM apartment alive
-	/// for as long as  the returned struct lives
+
 	#[must_use]
-	pub const unsafe fn from_raw(raw: IIASIORedecl) -> Self {
+	pub const fn from_raw(raw: IIASIORedecl) -> Self {
 		Self(raw)
-	}
-	
-	/// Exposes the underlying COM interface pointer
-	#[must_use]
-	pub const fn as_raw(&self) -> &IIASIORedecl {
-		&self.0
 	}
 }
 
-impl Driver for InstanceHandle {    
-	fn init(&self, main_window_handle: Option<win::HWND>) -> bool {
+impl Driver for UnsafeHandle {    
+	fn init(&self, main_window_handle: Option<HWND>) -> bool {
 		let sys_ref = main_window_handle.unwrap_or_default(); 
 
 		unsafe { self.0.init(sys_ref.0) }

@@ -1,14 +1,15 @@
 use std::collections::HashMap;
 use std::ffi::{CString, c_long, c_void};
 use std::fmt::Debug;
+use std::ops::Deref;
 use std::os::windows::io::AsRawHandle;
 use std::sync::Arc;
 use std::{ptr, thread};
 use std::time::Duration;
 use tap::Pipe;
 use windows_core::{GUID, WIN32_ERROR};
-use crate::{WinResult, dto, sys};
-use crate::driver::{Driver, InstanceHandle};
+use crate::{WinResult, driver, dto, sys};
+use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::utils::create_result;
 use crate::win::*;
@@ -97,7 +98,7 @@ impl Drop for Host {
 #[derive(Debug, Default)]
 struct WorkerContext {
 	next_token_val: usize,
-	drivers: HashMap<Token, InstanceHandle>,
+	drivers: HashMap<Token, driver::SafeHandle>,
 	current_msg: MSG
 }
 
@@ -119,14 +120,14 @@ impl WorkerContext {
 			}
 			
 			if self.current_msg.message == WM_USER as u32 {
-				self.handle_command();
+				unsafe { self.handle_command(); }
 			}
 			
 			unsafe { DispatchMessageW(&raw const self.current_msg); }
 		}
 	}
 
-	fn handle_command(&mut self) {
+	unsafe fn handle_command(&mut self) {
 		let command = unsafe {
 			*Box::from_raw(self.current_msg.wParam.0 as *mut Command)
 		};
@@ -147,7 +148,9 @@ impl WorkerContext {
 				self
 				.drivers
 				[&token]
+				.pipe_ref(|sh| unsafe { sh.as_unsafe() })
 				.clone()
+				.pipe(ExfiltratedHandle)
 				.pipe(|driver| self.respond(driver)),
 			
 			Command::Release(token) => {
@@ -158,27 +161,27 @@ impl WorkerContext {
 		}
 	}
 	
-	fn call_method(&self, driver: &InstanceHandle, method: Method) {
+	fn call_method(&self, driver: &driver::SafeHandle, method: Method) {
 		match method {
-			Method::Init { window_handle }          => driver.init               (window_handle).pipe(|ret| self.respond(ret)),
-			Method::Name                            => driver.name               (             ).pipe(|ret| self.respond(ret)),
-			Method::Version                         => driver.version            (             ).pipe(|ret| self.respond(ret)),
-			Method::LastError                       => driver.last_error         (             ).pipe(|ret| self.respond(ret)),
-			Method::Start                           => driver.start              (             ).pipe(|ret| self.respond(ret)),
-			Method::Stop                            => driver.stop               (             ).pipe(|ret| self.respond(ret)),
-			Method::ChannelCounts                   => driver.channel_counts     (             ).pipe(|ret| self.respond(ret)),
-			Method::Latencies                       => driver.latencies          (             ).pipe(|ret| self.respond(ret)),
-			Method::BufferSize                      => driver.buffer_size        (             ).pipe(|ret| self.respond(ret)),
-			Method::CanSampleRate { sample_rate }   => driver.can_sample_rate    (sample_rate  ).pipe(|ret| self.respond(ret)),
-			Method::GetSampleRate                   => driver.get_sample_rate    (             ).pipe(|ret| self.respond(ret)),
-			Method::SetSampleRate { sample_rate }   => driver.set_sample_rate    (sample_rate  ).pipe(|ret| self.respond(ret)),
-			Method::ClockSources                    => driver.clock_sources      (             ).pipe(|ret| self.respond(ret)),
-			Method::SetClockSource { clock_source } => driver.set_clock_source   (clock_source ).pipe(|ret| self.respond(ret)),
-			Method::SamplePosition                  => driver.sample_position    (             ).pipe(|ret| self.respond(ret)),
-			Method::ChannelInfo { channel_id }      => driver.channel_info       (channel_id   ).pipe(|ret| self.respond(ret)),
-			Method::DisposeBuffers                  => driver.dispose_buffers    (             ).pipe(|ret| self.respond(ret)),
-			Method::OpenControlPanel                => driver.open_control_panel (             ).pipe(|ret| self.respond(ret)),
-			Method::OutputReady                     => driver.output_ready       (             ).pipe(|ret| self.respond(ret)),
+			Method::Init { window_handle }          => driver.init              (window_handle).pipe(|ret| self.respond(ret)),
+			Method::Name                            => driver.name              (             ).pipe(|ret| self.respond(ret)),
+			Method::Version                         => driver.version           (             ).pipe(|ret| self.respond(ret)),
+			Method::LastError                       => driver.last_error        (             ).pipe(|ret| self.respond(ret)),
+			Method::Start                           => driver.start             (             ).pipe(|ret| self.respond(ret)),
+			Method::Stop                            => driver.stop              (             ).pipe(|ret| self.respond(ret)),
+			Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(|ret| self.respond(ret)),
+			Method::Latencies                       => driver.latencies         (             ).pipe(|ret| self.respond(ret)),
+			Method::BufferSize                      => driver.buffer_size       (             ).pipe(|ret| self.respond(ret)),
+			Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
+			Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(|ret| self.respond(ret)),
+			Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
+			Method::ClockSources                    => driver.clock_sources     (             ).pipe(|ret| self.respond(ret)),
+			Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(|ret| self.respond(ret)),
+			Method::SamplePosition                  => driver.sample_position   (             ).pipe(|ret| self.respond(ret)),
+			Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(|ret| self.respond(ret)),
+			Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(|ret| self.respond(ret)),
+			Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(|ret| self.respond(ret)),
+			Method::OutputReady                     => driver.output_ready      (             ).pipe(|ret| self.respond(ret)),
 			
 			Method::CreateBuffers {
 				channels,
@@ -191,7 +194,8 @@ impl WorkerContext {
 			
 			Method::Future { selector, opt } => unsafe {
 				driver
-				.as_raw()
+				.as_unsafe()
+				.0
 				.future(selector, opt)
 				.pipe(|code| create_result((), code))
 				.pipe(|ret| self.respond(ret));
@@ -200,7 +204,7 @@ impl WorkerContext {
 	}
 
 	fn create_driver(&mut self, guid: &GUID) -> WinResult<Token> {
-		let driver = unsafe { InstanceHandle::new_unguarded(guid) }?;
+		let driver = driver::SafeHandle::new(guid)?;
 		let token = self.create_token();
 		self.drivers.insert(token, driver);
 		Ok(token)
@@ -285,7 +289,7 @@ impl Proxy {
 	/// # Safety
 	/// The returned handle must not outlive [`Self::host`].
 	#[must_use]
-	pub unsafe fn exfiltrate(&self) -> InstanceHandle {
+	pub unsafe fn exfiltrate(&self) -> ExfiltratedHandle {
 		self.host.command_with_response(Command::Exfiltrate(self.token))
 	}
 }
@@ -336,5 +340,22 @@ impl Driver for Proxy {
 
 	fn future<T: AsioFuture>(&self, param: &mut T::Param) -> crate::Result<()> {
 		self.call(Method::Future { selector: T::SELECTOR, opt: <*mut _>::cast(param) })
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExfiltratedHandle(driver::UnsafeHandle);
+
+// SAFETY:
+// Exfiltration already broke COMs threading rules,
+// so there is no damage left to do
+unsafe impl Send for ExfiltratedHandle {}
+unsafe impl Sync for ExfiltratedHandle {}
+
+impl Deref for ExfiltratedHandle {
+	type Target = driver::UnsafeHandle;
+
+	fn deref(&self) -> &Self::Target {
+		&self.0
 	}
 }

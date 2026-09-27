@@ -5,7 +5,8 @@ use std::sync::mpsc::TrySendError;
 use std::{iter, slice};
 use std::sync::mpsc;
 use std::sync::OnceLock;
-use azo::{driver, Driver};
+use azo::driver::Driver;
+use azo::driver;
 use azo::dto::ChannelId;
 use azo::sys::*;
 
@@ -13,7 +14,7 @@ static SENDER: OnceLock<mpsc::SyncSender<c_long>> = OnceLock::new();
 
 fn main() {
 	let all = driver::Metadata::enumerate().unwrap();
-	let driver = all[0].create_instance().unwrap();
+	let driver = driver::SafeHandle::new(&all[0].clsid).unwrap();
 
 	if let Err(error) = play_sine(&driver) {
 		println!("{error} - {:?}", driver.last_error());
@@ -26,7 +27,7 @@ fn main() {
 	clippy::infinite_loop,
 	reason = "simplicity"
 )]
-fn play_sine(driver: &driver::InstanceHandle) -> azo::Result<()> {
+fn play_sine(driver: &driver::SafeHandle) -> azo::Result<()> {
 	let (sender, receiver) = mpsc::sync_channel::<c_long>(2);
 	SENDER.set(sender).unwrap();
 
