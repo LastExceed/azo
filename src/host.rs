@@ -79,7 +79,7 @@ impl Host {
 			if !success.as_bool() {
 				assert!(POST_MESSAGE_ERRORS.contains(&WIN32_ERROR::from_thread()), "undocumented error occurred");
 				// the worker thread is still initializing (or overworked).
-				// In any case, just wait and try again.
+				// In either case, just wait and try again (should only take a few attempts).
 				thread::sleep(Duration::from_nanos(1)); // sleep for as little as possible (1ms by default on win10+)
 				continue;
 			}
@@ -273,6 +273,7 @@ pub struct Proxy {
 
 #[cfg(feature = "host")]
 impl Proxy {
+	/// Returns the host that `self` belongs to.
 	#[must_use]
 	pub const fn host(&self) -> &Arc<Host> {
 		&self.host
@@ -281,10 +282,22 @@ impl Proxy {
 	fn call<Return>(&self, method: Method) -> Return {
 		self.host.command_with_response(Command::CallMethod(self.token, method))
 	}
-	
+
 	/// Exfiltrates a direct handle to the driver out of its COM apartment.
 	/// 
 	/// ## WARNING: This violates COMs threading rules!
+	/// 
+	/// This function primarily exists because of [`Driver::sample_position`] being essentially impossible to use correctly:
+	/// Unless the driver supports the [`BufferSwitchTimeInfo`](crate::sys::BufferSwitchTimeInfo) callback, [`Driver::sample_position`]
+	/// is the only way to retrieve timing information, and the authors of ASIO suggest calling it from within [`BufferSwitch`](crate::sys::BufferSwitch).
+	/// However, doing so actually violates COMs threading rules, because the driver instance resides in a single threaded apartment,
+	/// and the thread which invokes the callback is not the apartment owner. On the other hand, delegating the function call to the
+	/// apartment owner is not feasible, as the latency and jitter introduced by thread synchronization would render the returned timing information meaningless,
+	/// and more importantly, it can easily exceed the entire duration of a small buffer multiple times over.
+	/// 
+	/// Realistically though, ASIO drivers should be aware of this problem, and be able to handle calls to [`Driver::sample_position`] from the callback thread just fine.
+	/// Still, always prefer timing information provided in [`BufferSwitchTimeInfo`](crate::sys::BufferSwitchTimeInfo) and avoid using exfiltration for any other purpose
+	/// whenever possible.
 	/// 
 	/// # Safety
 	/// The returned handle must not outlive [`Self::host`].
@@ -347,8 +360,7 @@ impl Driver for Proxy {
 pub struct ExfiltratedHandle(driver::UnsafeHandle);
 
 // SAFETY:
-// Exfiltration already broke COMs threading rules,
-// so there is no damage left to do
+// Exfiltration already broke COMs threading rules, so this is fair game now.
 unsafe impl Send for ExfiltratedHandle {}
 unsafe impl Sync for ExfiltratedHandle {}
 

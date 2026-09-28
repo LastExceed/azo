@@ -14,6 +14,7 @@ pub use windows_core;
 pub use azo_sys as sys;
 pub use win::HWND;
 
+/// Represents an error returned by an ASIO driver.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Error(NonZeroI32);
 

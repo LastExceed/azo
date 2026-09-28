@@ -150,8 +150,8 @@ pub struct TimeCode {
 
 impl TimeCode {
 	/// Creates an "invalid" instance of `Self`,
-	/// meaning that the [`TimeCodeFlags::VALID`] bit in [`TimeCode::flags`] is not set,
-	/// and the remaining values are unspecified.
+	/// meaning that the [`TimeCodeFlags::VALID`] bit in [`TimeCode::flags`] is unset,
+	/// and the remaining values are (initialized but) unspecified.
 	#[must_use]
 	pub const fn invalid() -> Self {
 		// SAFETY:

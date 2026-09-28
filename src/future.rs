@@ -1,8 +1,7 @@
 use crate::sys::*;
 
-/// This has nothing to do with [`Future`],
-/// ASIO just happens to have a concept of the same name.
-/// (ASIO pre-dates widespread adoption of the concurrency model)
+/// This has nothing to do with [`std::future::Future`], ASIO just unfortunately happens to have a concept of the same name.
+/// In their defense, ASIO pre-dates widespread adoption of the async concurrency model.
 #[expect(clippy::module_name_repetitions, reason = "prefix added because std's Future is in the prelude")]
 pub trait AsioFuture {
 	const SELECTOR: FutureSelector;
