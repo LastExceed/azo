@@ -2,7 +2,7 @@
 resolver = "3"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 keywords = ["ASIO", "audio", "media", "sound", "steinberg"]
 categories = ["hardware-support", "multimedia", "multimedia::audio"]
@@ -28,7 +28,7 @@ host = ["dep:oneshot"]
 undocumented = ["azo-sys/undocumented"]
 
 [dependencies]
-azo-sys = { path = "./azo-sys", version = "0.3.0" }
+azo-sys = { path = "./azo-sys", version = "0.3.1" }
 oneshot = { version = "0.2.1", features = ["std"], optional = true }
 tap = "1.0.1"
 windows-core = "0.100.0"
