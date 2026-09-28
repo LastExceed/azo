@@ -8,10 +8,10 @@ use std::{ptr, thread};
 use std::time::Duration;
 use tap::Pipe;
 use windows_core::{GUID, WIN32_ERROR};
+use crate::utils::ResultCodeExt;
 use crate::{WinResult, driver, dto, sys};
 use crate::driver::Driver;
 use crate::future::AsioFuture;
-use crate::utils::create_result;
 use crate::win::*;
 
 const POST_MESSAGE_ERRORS: [WIN32_ERROR; 2] = [
@@ -197,7 +197,7 @@ impl WorkerContext {
 				.as_unsafe()
 				.0
 				.future(selector, opt)
-				.pipe(|code| create_result((), code))
+				.to_result()
 				.pipe(|ret| self.respond(ret));
 			},
 		}

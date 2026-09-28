@@ -4,7 +4,7 @@ use std::{mem, ptr};
 use crate::{WinResult, dto, sys};
 use crate::dto::Granularity;
 use crate::future::AsioFuture;
-use crate::utils::{cast_decoupled, create_result, cstring_from_bytes_until_nul};
+use crate::utils::{ResultCodeExt, cast_decoupled, cstring_from_bytes_until_nul};
 use crate::win::{CLSCTX_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize, HWND, S_FALSE};
 use sys::IIASIORedecl;
 use tap::Pipe;
@@ -281,24 +281,24 @@ impl Driver for UnsafeHandle {
 	}
 	
 	fn start(&self) -> crate::Result<()> {
-		let code = unsafe { self.0.start() };
-		create_result((), code)
+		unsafe { self.0.start() }
+		.to_result()
 	}
 	fn stop(&self) -> crate::Result<()> {
-		let code = unsafe { self.0.stop() };
-		create_result((), code)
+		unsafe { self.0.stop() }
+		.to_result()
 	}
 
 	fn channel_counts(&self) -> crate::Result<dto::ChannelCounts> {
 		let mut counts = dto::ChannelCounts { in_: 0, out: 0 };
-		let code = unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) };
-		create_result(counts, code)
+		unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) }
+    	.to_result_with(|| counts)
 	}
 
 	fn latencies(&self) -> crate::Result<dto::Latencies> {
 		let mut latencies = dto::Latencies { in_: 0, out: 0 };
-		let code = unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) };
-		create_result(latencies, code)
+		unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) }
+    	.to_result_with(|| latencies)
 	}
 
 	fn buffer_size(&self) -> crate::Result<dto::BufferSize> {
@@ -306,34 +306,32 @@ impl Driver for UnsafeHandle {
 		let mut max         = -2;
 		let mut preferred   = -3;
 		let mut granularity = -4;
-		let code = unsafe { self.0.get_buffer_size(&raw mut min, &raw mut max, &raw mut preferred, &raw mut granularity) };
-		create_result((), code)?;
-
-		let buffer_size =
-			dto::BufferSize {
-				min,
-				max,
-				preferred,
-				granularity: NonZeroI32::new(granularity).map(Granularity::from)
-			};
-
-		Ok(buffer_size)
+		
+		unsafe { self.0.get_buffer_size(&raw mut min, &raw mut max, &raw mut preferred, &raw mut granularity) }
+    	.to_result()
+    	.map(|()| dto::BufferSize {
+			min,
+			max,
+			preferred,
+			granularity: NonZeroI32::new(granularity).map(Granularity::from)
+		})
 	}
 
 	fn can_sample_rate(&self, sample_rate: sys::SampleRate) -> crate::Result<()> {
-		let code = unsafe { self.0.can_sample_rate(sample_rate) };
-		create_result((), code)
+		unsafe { self.0.can_sample_rate(sample_rate) }
+    	.to_result()
 	}
 	
 	fn get_sample_rate(&self) -> crate::Result<sys::SampleRate> {
 		let mut sample_rate = f64::NAN;
-		let code = unsafe { self.0.get_sample_rate(&raw mut sample_rate) };
-		create_result(sample_rate, code)
+
+		unsafe { self.0.get_sample_rate(&raw mut sample_rate) }
+    	.to_result_with(|| sample_rate)
 	}
 
 	fn set_sample_rate(&self, sample_rate: sys::SampleRate) -> crate::Result<()> {
-		let code = unsafe { self.0.set_sample_rate(sample_rate) };
-		create_result((), code)
+		unsafe { self.0.set_sample_rate(sample_rate) }
+		.to_result()
 	}
 
 	#[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
@@ -341,16 +339,17 @@ impl Driver for UnsafeHandle {
 		let mut count = 1;
 		let mut first = unsafe { mem::zeroed() };
 		
-		let code = unsafe { self.0.get_clock_sources(&raw mut first, &raw mut count) };
-		create_result((), code)?;
+		unsafe { self.0.get_clock_sources(&raw mut first, &raw mut count) }
+		.to_result()?;
 	
 		match count {
 			0   => Ok(vec![]),
 			1   => Ok(vec![first]),
 			2.. => {
 				let mut all = vec![unsafe { mem::zeroed() }; count as _];
-				let code2 = unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count) };
-				create_result(all, code2)
+				unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count) }
+				.to_result()
+				.map(|()| all)
 			}
 			neg => panic!("driver reported negative number of clock sources ({neg})")
 		}
@@ -358,21 +357,19 @@ impl Driver for UnsafeHandle {
 
 	/// Selects a [`ClockSource`](sys::ClockSource), as enumerated via [`.clock_sources()`](Self::clock_sources)
 	fn set_clock_source(&self, clock_source: sys::ClockSourceIndex) -> crate::Result<()> {
-		let code = unsafe { self.0.set_clock_source(clock_source) };
-		create_result((), code)
+		unsafe { self.0.set_clock_source(clock_source) }
+    	.to_result()
 	}
 
 	fn sample_position(&self) -> crate::Result<dto::SamplePosition> {
 		let mut position   = sys::Samples  ::default();
 		let mut time_stamp = sys::TimeStamp::default();
-		let code = unsafe { self.0.get_sample_position(&raw mut position, &raw mut time_stamp) };
 		
-		let out = dto::SamplePosition {
+		unsafe { self.0.get_sample_position(&raw mut position, &raw mut time_stamp) }
+		.to_result_with(|| dto::SamplePosition {
 			position  : position  .into(),
 			time_stamp: time_stamp.into()
-		};
-
-		create_result(out, code)
+		})
 	}
 
 	fn channel_info(&self, channel_id: dto::ChannelId) -> crate::Result<dto::ChannelInfoResponse> {
@@ -382,8 +379,8 @@ impl Driver for UnsafeHandle {
 				is_input: channel_id.input.into(),
 				..unsafe { mem::zeroed() }
 			};
-		let code = unsafe { self.0.get_channel_info(&raw mut info) };
-		create_result(info.into(), code)
+		unsafe { self.0.get_channel_info(&raw mut info) }
+    	.to_result_with(|| info.into())
 	}
 
 	unsafe fn create_buffers(
@@ -404,35 +401,34 @@ impl Driver for UnsafeHandle {
 			)
 			.collect::<Vec<_>>();
 		
-		let code = unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) };
-		let buffers =
+		unsafe { self.0.create_buffers(infos.as_mut_ptr(), infos.len() as _, buffer_size, callbacks.cast_mut()) }
+    	.to_result_with(||
 			infos
 			.into_iter()
-			.map(|info| info.buffers);
-
-		create_result(buffers, code)
+			.map(|info| info.buffers)
+		)
 	}
 
 	fn dispose_buffers(&self) -> crate::Result<()> {
-		let code = unsafe { self.0.dispose_buffers() };
-		create_result((), code)
+		unsafe { self.0.dispose_buffers() }
+    	.to_result()
 	}
 
 	fn open_control_panel(&self) -> crate::Result<()> {
-		let code = unsafe { self.0.control_panel() };
-		create_result((), code)
+		unsafe { self.0.control_panel() }
+		.to_result()
 	}
 
 	fn future<T: AsioFuture>(&self, param: &mut T::Param) -> crate::Result<()> {
 		let selector = T::SELECTOR;
 		let opt = ptr::from_mut(param).cast();
 		
-		let code = unsafe { self.0.future(selector, opt) };
-		create_result((), code)
+		unsafe { self.0.future(selector, opt) }
+		.to_result()
 	}
 	
 	fn output_ready(&self) -> crate::Result<()> {
-		let code = unsafe { self.0.output_ready() };
-		create_result((), code)
+		unsafe { self.0.output_ready() }
+		.to_result()
 	}
 }
