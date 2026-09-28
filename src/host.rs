@@ -188,7 +188,7 @@ impl WorkerContext {
 				buffer_size,
 				callbacks
 			} => unsafe {
-				let ret = driver.create_buffers(channels, buffer_size, callbacks);
+				let ret = driver.create_buffers(channels, buffer_size, callbacks).map(Iterator::collect::<Vec<_>>);
 				self.respond(ret);
 			}
 			
