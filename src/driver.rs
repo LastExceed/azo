@@ -1,4 +1,5 @@
 use std::ffi::{CString, c_long, c_void};
+use std::mem::MaybeUninit;
 use std::num::NonZeroI32;
 use std::{mem, ptr};
 use crate::{WinResult, dto, sys};
@@ -290,30 +291,49 @@ impl Driver for UnsafeHandle {
 	}
 
 	fn channel_counts(&self) -> crate::Result<dto::ChannelCounts> {
-		let mut counts = dto::ChannelCounts { in_: 0, out: 0 };
-		unsafe { self.0.get_channels(&raw mut counts.in_, &raw mut counts.out) }
-    	.to_result_with(|| counts)
+		let mut in_ = MaybeUninit::uninit();
+		let mut out = MaybeUninit::uninit();
+		
+		unsafe { self.0.get_channels(in_.as_mut_ptr(), out.as_mut_ptr()) }
+    	.to_result_with(|| dto::ChannelCounts {
+			in_: unsafe { in_.assume_init() },
+			out: unsafe { out.assume_init() }
+		})
 	}
 
 	fn latencies(&self) -> crate::Result<dto::Latencies> {
-		let mut latencies = dto::Latencies { in_: 0, out: 0 };
-		unsafe { self.0.get_latencies(&raw mut latencies.in_, &raw mut latencies.out) }
-    	.to_result_with(|| latencies)
+		let mut in_ = MaybeUninit::uninit();
+		let mut out = MaybeUninit::uninit();
+		
+		unsafe { self.0.get_latencies(in_.as_mut_ptr(), out.as_mut_ptr()) }
+    	.to_result_with(|| dto::Latencies {
+			in_: unsafe { in_.assume_init() },
+			out: unsafe { out.assume_init() }
+		})
 	}
 
 	fn buffer_size(&self) -> crate::Result<dto::BufferSize> {
-		let mut min         = -1;
-		let mut max         = -2;
-		let mut preferred   = -3;
-		let mut granularity = -4;
+		let mut min         = MaybeUninit::uninit();
+		let mut max         = MaybeUninit::uninit();
+		let mut preferred   = MaybeUninit::uninit();
+		let mut granularity = MaybeUninit::uninit();
 		
-		unsafe { self.0.get_buffer_size(&raw mut min, &raw mut max, &raw mut preferred, &raw mut granularity) }
+		unsafe {
+			self.0.get_buffer_size(
+				min.as_mut_ptr(),
+				max.as_mut_ptr(),
+				preferred.as_mut_ptr(),
+				granularity.as_mut_ptr()
+			)
+		}
     	.to_result()
     	.map(|()| dto::BufferSize {
-			min,
-			max,
-			preferred,
-			granularity: NonZeroI32::new(granularity).map(Granularity::from)
+			min        : unsafe { min        .assume_init() },
+			max        : unsafe { max        .assume_init() },
+			preferred  : unsafe { preferred  .assume_init() },
+			granularity: unsafe { granularity.assume_init() }
+				.pipe(NonZeroI32::new)
+				.map(Granularity::from)
 		})
 	}
 
@@ -323,10 +343,10 @@ impl Driver for UnsafeHandle {
 	}
 	
 	fn get_sample_rate(&self) -> crate::Result<sys::SampleRate> {
-		let mut sample_rate = f64::NAN;
+		let mut sample_rate = MaybeUninit::uninit();
 
-		unsafe { self.0.get_sample_rate(&raw mut sample_rate) }
-    	.to_result_with(|| sample_rate)
+		unsafe { self.0.get_sample_rate(sample_rate.as_mut_ptr()) }
+    	.to_result_with(|| unsafe { sample_rate.assume_init() })
 	}
 
 	fn set_sample_rate(&self, sample_rate: sys::SampleRate) -> crate::Result<()> {
@@ -336,20 +356,23 @@ impl Driver for UnsafeHandle {
 
 	#[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
 	fn clock_sources(&self) -> crate::Result<Vec<sys::ClockSource>> {
-		let mut count = 1;
-		let mut first = unsafe { mem::zeroed() };
+		let mut count = 1; // on input this is the # of requested items
+		let mut first = MaybeUninit::uninit();
 		
-		unsafe { self.0.get_clock_sources(&raw mut first, &raw mut count) }
+		unsafe { self.0.get_clock_sources(first.as_mut_ptr(), &raw mut count) }
 		.to_result()?;
 	
 		match count {
 			0   => Ok(vec![]),
-			1   => Ok(vec![first]),
+			1   => Ok(vec![unsafe { first.assume_init() }]),
 			2.. => {
-				let mut all = vec![unsafe { mem::zeroed() }; count as _];
-				unsafe { self.0.get_clock_sources(all.as_mut_ptr(), &raw mut count) }
-				.to_result()
-				.map(|()| all)
+				let mut all = Vec::<sys::ClockSource>::with_capacity(count as _);
+				
+				unsafe { self.0.get_clock_sources(all.spare_capacity_mut().as_mut_ptr().cast(), &raw mut count) }
+				.to_result()?;
+			
+				unsafe { all.set_len(count as _); }
+				Ok(all)
 			}
 			neg => panic!("driver reported negative number of clock sources ({neg})")
 		}
@@ -362,13 +385,13 @@ impl Driver for UnsafeHandle {
 	}
 
 	fn sample_position(&self) -> crate::Result<dto::SamplePosition> {
-		let mut position   = sys::Samples  ::default();
-		let mut time_stamp = sys::TimeStamp::default();
+		let mut position   = MaybeUninit::uninit();
+		let mut time_stamp = MaybeUninit::uninit();
 		
-		unsafe { self.0.get_sample_position(&raw mut position, &raw mut time_stamp) }
+		unsafe { self.0.get_sample_position(position.as_mut_ptr(), time_stamp.as_mut_ptr()) }
 		.to_result_with(|| dto::SamplePosition {
-			position  : position  .into(),
-			time_stamp: time_stamp.into()
+			position  : unsafe { position  .assume_init() }.into(),
+			time_stamp: unsafe { time_stamp.assume_init() }.into()
 		})
 	}
 
