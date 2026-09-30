@@ -2,6 +2,8 @@
 
 A library for interacting with ASIO (Audio Stream Input/Output) drivers.
 
+[![](https://img.shields.io/crates/v/azo?label=crates.io%20(azo))](https://crates.io/crates/azo) [![](https://img.shields.io/crates/v/azo-sys?label=crates.io%20(azo-sys))]((https://crates.io/crates/azo-sys)) ![](https://img.shields.io/crates/d/azo)
+
 ### Not an `ASIO SDK` Wrapper
 
 For Rust bindings to the official [ASIO SDK by Steinberg](https://www.steinberg.net/developers/prorietary-sdk/), see the [`asio-sys`](https://crates.io/crates/asio-sys) crate instead.
