@@ -12,7 +12,7 @@ use tap::Pipe;
 use windows_core::{GUID, HSTRING, IUnknown};
 
 #[cfg(feature = "host")]
-pub use crate::host::{Proxy, ExfiltratedHandle};
+pub use crate::host::Proxy;
 
 pub trait Driver {
 	/// The spec unfortunately does not elaborate on the purpose of the parameter.

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::ffi::{CString, c_long, c_void};
 use std::fmt::Debug;
-use std::ops::Deref;
 use std::os::windows::io::AsRawHandle;
 use std::sync::Arc;
 use std::{ptr, thread};
@@ -144,15 +143,6 @@ impl WorkerContext {
 				[&token]
 				.pipe_ref(|driver| self.call_method(driver, method)),
 			
-			Command::Exfiltrate(token) =>
-				self
-				.drivers
-				[&token]
-				.pipe_ref(|sh| unsafe { sh.as_unsafe() })
-				.clone()
-				.pipe(ExfiltratedHandle)
-				.pipe(|driver| self.respond(driver)),
-			
 			Command::Release(token) => {
 				// no need to worry about any potential exfiltrations,
 				// as COM interface pointers are themselves reference counted.
@@ -231,7 +221,6 @@ impl WorkerContext {
 enum Command {
 	Create(GUID),
 	CallMethod(Token, Method),
-	Exfiltrate(Token),
 	Release(Token)
 }
 
@@ -282,29 +271,6 @@ impl Proxy {
 	fn call<Return>(&self, method: Method) -> Return {
 		self.host.command_with_response(Command::CallMethod(self.token, method))
 	}
-
-	/// Exfiltrates a direct handle to the driver out of its COM apartment.
-	/// 
-	/// ## WARNING: This violates COMs threading rules!
-	/// 
-	/// This function primarily exists because of [`Driver::sample_position`] being essentially impossible to use correctly:
-	/// Unless the driver supports the [`BufferSwitchTimeInfo`](crate::sys::BufferSwitchTimeInfo) callback, [`Driver::sample_position`]
-	/// is the only way to retrieve timing information, and the authors of ASIO suggest calling it from within [`BufferSwitch`](crate::sys::BufferSwitch).
-	/// However, doing so actually violates COMs threading rules, because the driver instance resides in a single threaded apartment,
-	/// and the thread which invokes the callback is not the apartment owner. On the other hand, delegating the function call to the
-	/// apartment owner is not feasible, as the latency and jitter introduced by thread synchronization would render the returned timing information meaningless,
-	/// and more importantly, it can easily exceed the entire duration of a small buffer multiple times over.
-	/// 
-	/// Realistically though, ASIO drivers should be aware of this problem, and be able to handle calls to [`Driver::sample_position`] from the callback thread just fine.
-	/// Still, always prefer timing information provided in [`BufferSwitchTimeInfo`](crate::sys::BufferSwitchTimeInfo) and avoid using exfiltration for any other purpose
-	/// whenever possible.
-	/// 
-	/// # Safety
-	/// The returned handle must not outlive [`Self::host`].
-	#[must_use]
-	pub unsafe fn exfiltrate(&self) -> ExfiltratedHandle {
-		self.host.command_with_response(Command::Exfiltrate(self.token))
-	}
 }
 
 impl Drop for Proxy {
@@ -353,21 +319,5 @@ impl Driver for Proxy {
 
 	fn future<T: AsioFuture>(&self, param: &mut T::Param) -> crate::Result<()> {
 		self.call(Method::Future { selector: T::SELECTOR, opt: <*mut _>::cast(param) })
-	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ExfiltratedHandle(driver::UnsafeHandle);
-
-// SAFETY:
-// Exfiltration already broke COMs threading rules, so this is fair game now.
-unsafe impl Send for ExfiltratedHandle {}
-unsafe impl Sync for ExfiltratedHandle {}
-
-impl Deref for ExfiltratedHandle {
-	type Target = driver::UnsafeHandle;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
 	}
 }
