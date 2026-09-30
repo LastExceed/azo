@@ -2,7 +2,7 @@
 name = "azo-sys"
 description = "ffi types for azo"
 publish = true
-version.workspace = true
+version = "0.3.2"
 edition.workspace = true
 keywords.workspace = true
 categories.workspace = true

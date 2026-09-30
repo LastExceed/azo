@@ -1,9 +1,9 @@
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'azo/v[0-9]+.[0-9]+.[0-9]+'
 
-name: Publish on crates.io
+name: Publish `azo` on crates.io
 
 jobs:
   publish:
@@ -22,4 +22,4 @@ jobs:
       - name: Publish crates
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: cargo publish --workspace
+        run: cargo publish --package azo

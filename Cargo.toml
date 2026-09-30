@@ -2,7 +2,6 @@
 resolver = "3"
 
 [workspace.package]
-version = "0.3.2"
 edition = "2024"
 keywords = ["ASIO", "audio", "media", "sound", "steinberg"]
 categories = ["hardware-support", "multimedia", "multimedia::audio"]
@@ -14,7 +13,7 @@ repository = "https://github.com/LastExceed/azo"
 name = "azo"
 description = "Library for interacting with ASIO drivers"
 publish = true
-version.workspace = true
+version = "0.3.2"
 edition.workspace = true
 keywords.workspace = true
 categories.workspace = true
