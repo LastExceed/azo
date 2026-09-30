@@ -132,70 +132,59 @@ impl WorkerContext {
 		};
 		
 		match command {
-			Command::Create(guid) =>
-				self
-				.create_driver(&guid)
-        		.pipe(|result| self.respond(result)),
+			Command::Create(guid) => {
+				let result = self.try_create_driver(&guid);
+				self.respond(result);
+			}
 			
-			Command::CallMethod(token, method) =>
-				self
-				.drivers
-				[&token]
-				.pipe_ref(|driver| self.call_method(driver, method)),
+			Command::CallMethod(token, method) => {
+				let driver = &self.drivers[&token];
+				
+				match method {
+					Method::Init { window_handle }          => driver.init              (window_handle).pipe(|ret| self.respond(ret)),
+					Method::Name                            => driver.name              (             ).pipe(|ret| self.respond(ret)),
+					Method::Version                         => driver.version           (             ).pipe(|ret| self.respond(ret)),
+					Method::LastError                       => driver.last_error        (             ).pipe(|ret| self.respond(ret)),
+					Method::Start                           => driver.start             (             ).pipe(|ret| self.respond(ret)),
+					Method::Stop                            => driver.stop              (             ).pipe(|ret| self.respond(ret)),
+					Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(|ret| self.respond(ret)),
+					Method::Latencies                       => driver.latencies         (             ).pipe(|ret| self.respond(ret)),
+					Method::BufferSize                      => driver.buffer_size       (             ).pipe(|ret| self.respond(ret)),
+					Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
+					Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(|ret| self.respond(ret)),
+					Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
+					Method::ClockSources                    => driver.clock_sources     (             ).pipe(|ret| self.respond(ret)),
+					Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(|ret| self.respond(ret)),
+					Method::SamplePosition                  => driver.sample_position   (             ).pipe(|ret| self.respond(ret)),
+					Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(|ret| self.respond(ret)),
+					Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(|ret| self.respond(ret)),
+					Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(|ret| self.respond(ret)),
+					Method::OutputReady                     => driver.output_ready      (             ).pipe(|ret| self.respond(ret)),
+					Method::CreateBuffers { channels, buffer_size, callbacks } => unsafe {
+						let ret = driver.create_buffers(channels, buffer_size, callbacks).map(Iterator::collect::<Vec<_>>);
+						self.respond(ret);
+					}
+					Method::Future { selector, opt } => unsafe {
+						driver
+						.as_unsafe()
+						.0
+						.future(selector, opt)
+						.to_result()
+						.pipe(|ret| self.respond(ret));
+					},
+				}
+			}
 			
 			Command::Release(token) => {
-				// no need to worry about any potential exfiltrations,
-				// as COM interface pointers are themselves reference counted.
-				_ = self.drivers.remove(&token);
+				drop(self.drivers.remove(&token));
 			}
-		}
-	}
-	
-	fn call_method(&self, driver: &driver::SafeHandle, method: Method) {
-		match method {
-			Method::Init { window_handle }          => driver.init              (window_handle).pipe(|ret| self.respond(ret)),
-			Method::Name                            => driver.name              (             ).pipe(|ret| self.respond(ret)),
-			Method::Version                         => driver.version           (             ).pipe(|ret| self.respond(ret)),
-			Method::LastError                       => driver.last_error        (             ).pipe(|ret| self.respond(ret)),
-			Method::Start                           => driver.start             (             ).pipe(|ret| self.respond(ret)),
-			Method::Stop                            => driver.stop              (             ).pipe(|ret| self.respond(ret)),
-			Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(|ret| self.respond(ret)),
-			Method::Latencies                       => driver.latencies         (             ).pipe(|ret| self.respond(ret)),
-			Method::BufferSize                      => driver.buffer_size       (             ).pipe(|ret| self.respond(ret)),
-			Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
-			Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(|ret| self.respond(ret)),
-			Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
-			Method::ClockSources                    => driver.clock_sources     (             ).pipe(|ret| self.respond(ret)),
-			Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(|ret| self.respond(ret)),
-			Method::SamplePosition                  => driver.sample_position   (             ).pipe(|ret| self.respond(ret)),
-			Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(|ret| self.respond(ret)),
-			Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(|ret| self.respond(ret)),
-			Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(|ret| self.respond(ret)),
-			Method::OutputReady                     => driver.output_ready      (             ).pipe(|ret| self.respond(ret)),
-			
-			Method::CreateBuffers {
-				channels,
-				buffer_size,
-				callbacks
-			} => unsafe {
-				let ret = driver.create_buffers(channels, buffer_size, callbacks).map(Iterator::collect::<Vec<_>>);
-				self.respond(ret);
-			}
-			
-			Method::Future { selector, opt } => unsafe {
-				driver
-				.as_unsafe()
-				.0
-				.future(selector, opt)
-				.to_result()
-				.pipe(|ret| self.respond(ret));
-			},
 		}
 	}
 
-	fn create_driver(&mut self, guid: &GUID) -> WinResult<Token> {
+	fn try_create_driver(&mut self, guid: &GUID) -> WinResult<Token> {
 		let driver = driver::SafeHandle::new(guid)?;
 		let token = self.create_token();
+
 		self.drivers.insert(token, driver);
 		Ok(token)
 	}
@@ -262,7 +251,7 @@ pub struct Proxy {
 
 #[cfg(feature = "host")]
 impl Proxy {
-	/// Returns the host that `self` belongs to.
+	/// Returns the [`Host`] which `self` belongs to.
 	#[must_use]
 	pub const fn host(&self) -> &Arc<Host> {
 		&self.host
