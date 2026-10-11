@@ -5,11 +5,11 @@ use std::{mem, ptr};
 use crate::{WinResult, dto, sys};
 use crate::dto::Granularity;
 use crate::future::AsioFuture;
-use crate::utils::{ResultCodeExt, cast_decoupled, cstring_from_bytes_until_nul};
-use crate::win::{CLSCTX_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize, HWND, S_FALSE};
+use crate::utils::{ResultCodeExt, cstring_from_bytes_until_nul};
+use crate::win::{CLSCTX_SERVER, COINIT_APARTMENTTHREADED, CoInitializeEx, CoUninitialize, E_POINTER, HWND, S_FALSE};
 use sys::IIASIORedecl;
 use tap::Pipe;
-use windows_core::{GUID, HSTRING, IUnknown};
+use windows_core::{GUID, HSTRING};
 
 #[cfg(feature = "host")]
 pub use crate::host::Proxy;
@@ -239,15 +239,21 @@ impl UnsafeHandle {
 	/// * is initialized on this thread
 	/// * stays that way until this handle and all its clones got dropped
 	pub unsafe fn new(guid: &GUID) -> WinResult<Self> {
-		// Created as `IUnknown` because windows-rs binds this function in
-		// a way where the IID is acquired from a trait-associated constant,
-		// which is impossible to implement for `IIASIORedecl` (see its doc comment)
-		let i_unknown: IUnknown = unsafe { CoCreateInstance(guid, None, CLSCTX_SERVER as _) }?;
-
-		// The aforementioned binding limitation also applies to `.cast()`.
-		// Luckily, the underlying `.query()` is public, which enables the following work-around:
-		unsafe { cast_decoupled::<IIASIORedecl>(&i_unknown, guid) }
-		.map(Self)
+		// The CLSID doubles as the IID: every ASIO driver answers `QueryInterface` for its own
+		// CLSID (the SDK's host code creates drivers this way), and asking for it directly
+		// hands over the single reference `CoCreateInstance` made. Creating an `IUnknown` and
+		// querying it instead releases a reference before `init`, and some drivers (wineasio
+		// 1.3.0) read state in `Release` that `init` has not set yet.
+		// windows-rs binds `CoCreateInstance` with the IID taken from the target type, which
+		// `IIASIORedecl` cannot provide (see its doc comment), hence the raw import.
+		windows_core::link!("ole32.dll" "system" fn CoCreateInstance(rclsid: *const GUID, punkouter: *mut c_void, dwclscontext: u32, riid: *const GUID, ppv: *mut *mut c_void) -> windows_core::HRESULT);
+		let mut raw = ptr::null_mut();
+		unsafe { CoCreateInstance(guid, ptr::null_mut(), CLSCTX_SERVER as _, guid, &raw mut raw) }.ok()?;
+		if raw.is_null() {
+			return Err(E_POINTER.into());
+		}
+		// SAFETY: `raw` is a non-null interface pointer of the requested IID, owning one reference.
+		Ok(Self(unsafe { <IIASIORedecl as windows_core::Interface>::from_raw(raw) }))
 	}
 
 	#[must_use]
