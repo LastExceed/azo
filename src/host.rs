@@ -242,14 +242,12 @@ enum Method {
 	Future { selector: sys::FutureSelector, opt: *mut c_void }
 }
 
-#[cfg(feature = "host")]
 #[derive(Debug)]
 pub struct Proxy {
 	token: Token,
 	host : Arc<Host>
 }
 
-#[cfg(feature = "host")]
 impl Proxy {
 	/// Returns the [`Host`] which `self` belongs to.
 	#[must_use]
