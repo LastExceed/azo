@@ -118,8 +118,9 @@ impl WorkerContext {
 				break;
 			}
 			
-			if self.current_msg.message == WM_APP as u32 {
+			if self.current_msg.message == WM_APP as u32 && self.current_msg.hwnd.0.is_null() {
 				unsafe { self.handle_command(); }
+				continue;
 			}
 			
 			unsafe { DispatchMessageW(&raw const self.current_msg); }
@@ -213,6 +214,7 @@ enum Command {
 	Release(Token)
 }
 
+/// Identifies a hosted driver instance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct Token(usize);
 
@@ -242,6 +244,7 @@ enum Method {
 	Future { selector: sys::FutureSelector, opt: *mut c_void }
 }
 
+/// A thread-safe proxy for a driver instance hosted in a [`Host`].
 #[derive(Debug)]
 pub struct Proxy {
 	token: Token,
