@@ -14,6 +14,9 @@ use windows_core::{GUID, HSTRING, IUnknown};
 #[cfg(feature = "host")]
 pub use crate::host::Proxy;
 
+/// Room for clock sources in one [`Driver::clock_sources()`] call.
+pub const MAX_CLOCK_SOURCES: usize = 64;
+
 pub trait Driver {
 	/// The spec unfortunately does not elaborate on the purpose of the parameter.
 	#[must_use]
@@ -354,28 +357,25 @@ impl Driver for UnsafeHandle {
 		.to_result()
 	}
 
+	/// Asks once, with room for [`MAX_CLOCK_SOURCES`].
+	///
+	/// On input `count` is the size of the array. Probing with room for one and then asking
+	/// again trusts the driver to honour that size and to report the same count twice; a
+	/// single call with the returned count capped to the array needs neither.
 	#[expect(clippy::panic_in_result_fn, reason = "invalid driver behaviour")]
 	fn clock_sources(&self) -> crate::Result<Vec<sys::ClockSource>> {
-		let mut count = 1; // on input this is the # of requested items
-		let mut first = MaybeUninit::uninit();
+		let mut all = Vec::<sys::ClockSource>::with_capacity(MAX_CLOCK_SOURCES);
+		let mut count = MAX_CLOCK_SOURCES as _; // on input this is the # of requested items
 		
-		unsafe { self.0.get_clock_sources(first.as_mut_ptr(), &raw mut count) }
+		unsafe { self.0.get_clock_sources(all.spare_capacity_mut().as_mut_ptr().cast(), &raw mut count) }
 		.to_result()?;
-	
-		match count {
-			0   => Ok(vec![]),
-			1   => Ok(vec![unsafe { first.assume_init() }]),
-			2.. => {
-				let mut all = Vec::<sys::ClockSource>::with_capacity(count as _);
-				
-				unsafe { self.0.get_clock_sources(all.spare_capacity_mut().as_mut_ptr().cast(), &raw mut count) }
-				.to_result()?;
-			
-				unsafe { all.set_len(count as _); }
-				Ok(all)
-			}
-			neg => panic!("driver reported negative number of clock sources ({neg})")
-		}
+		
+		let count = usize::try_from(count)
+		.unwrap_or_else(|_| panic!("driver reported negative number of clock sources ({count})"))
+		.min(MAX_CLOCK_SOURCES);
+		
+		unsafe { all.set_len(count); }
+		Ok(all)
 	}
 
 	/// Selects a [`ClockSource`](sys::ClockSource), as enumerated via [`.clock_sources()`](Self::clock_sources)
