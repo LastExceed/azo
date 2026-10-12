@@ -7,6 +7,7 @@
     clippy::borrow_as_ptr,
     clippy::ptr_as_ptr,
     clippy::decimal_literal_representation,
+    clippy::too_many_arguments,
     reason = "generated"
 )]
 

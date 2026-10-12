@@ -1,22 +1,22 @@
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::ffi::{CString, c_long, c_void};
 use std::fmt::Debug;
 use std::os::windows::io::AsRawHandle;
-use std::sync::Arc;
+use std::sync::{Arc, Once, mpsc};
 use std::{ptr, thread};
 use std::time::Duration;
 use tap::Pipe;
-use windows_core::{GUID, WIN32_ERROR};
+use windows_core::{GUID, PCWSTR, WIN32_ERROR, w};
 use crate::utils::ResultCodeExt;
 use crate::{WinResult, driver, dto, sys};
 use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::win::*;
 
-const POST_MESSAGE_ERRORS: [WIN32_ERROR; 2] = [
-	WIN32_ERROR(ERROR_INVALID_THREAD_ID as _),
-	WIN32_ERROR(ERROR_NOT_ENOUGH_QUOTA  as _)
-];
+/// The window class of the apartment's message-only window.
+const CLASS_NAME: PCWSTR = w!("azo-host");
 
 /// A COM STA to create driver instances in, hosted by a dedicated thread driving a message pump.
 /// Provides a mechanism for funneling driver interactions through the apartment owner
@@ -26,19 +26,29 @@ const POST_MESSAGE_ERRORS: [WIN32_ERROR; 2] = [
 /// 
 /// Too much technical jargon? Then [`Host`] is exactly what you need: An abstraction over a bunch of
 /// arcane machinery required for correctness, which consumers of [`azo`](crate) should not have to worry about.
+///
+/// Commands reach the apartment as messages to a message-only window rather than as thread
+/// messages: a modal loop on the apartment's thread (a driver's control panel dialog,
+/// `MessageBox`) dispatches window messages but drops thread messages, so a command sent
+/// while a panel is open would never be answered. Such a command runs inside the modal loop,
+/// re-entrantly, as a window-based host's would.
 #[derive(Debug)]
 pub struct Host {
-	thread_id: u32
+	thread_id: u32,
+	/// The message-only window's handle (an `HWND`, which is not [`Send`]).
+	window: usize
 }
 
 impl Host {
 	pub fn new() -> Arc<Self> {
-		thread::spawn(WorkerContext::host_sta)
+		let (sender, receiver) = mpsc::channel();
+		let thread_id = thread::spawn(move || WorkerContext::host_sta(&sender))
 		.as_raw_handle()
 		.pipe(HANDLE)
-		.pipe(|handle| unsafe { GetThreadId(handle) })
-		.pipe(|thread_id| Self { thread_id })
-		.pipe(Arc::new)
+		.pipe(|handle| unsafe { GetThreadId(handle) });
+		let window = receiver.recv().expect("the apartment thread should create its window");
+		assert_ne!(window, 0, "creating the apartment's message-only window failed");
+		Arc::new(Self { thread_id, window })
 	}
 	
 	/// Creates an instance of a driver in this host's STA and returns a [`Proxy`] for interacting with that driver,
@@ -67,8 +77,8 @@ impl Host {
 		
 		loop {
 			let success = unsafe {
-				PostThreadMessageW(
-					self.thread_id,
+				PostMessageW(
+					Some(HWND(self.window as _)),
 					WM_APP as _,
 					WPARAM(in_ as _),
 					LPARAM(out as _)
@@ -76,9 +86,8 @@ impl Host {
 			};
 			
 			if !success.as_bool() {
-				assert!(POST_MESSAGE_ERRORS.contains(&WIN32_ERROR::from_thread()), "undocumented error occurred");
-				// the worker thread is still initializing (or overworked).
-				// In either case, just wait and try again (should only take a few attempts).
+				assert_eq!(WIN32_ERROR::from_thread(), WIN32_ERROR(ERROR_NOT_ENOUGH_QUOTA as _), "undocumented error occurred");
+				// the queue is full: wait for the apartment to catch up.
 				thread::sleep(Duration::from_nanos(1)); // sleep for as little as possible (1ms by default on win10+)
 				continue;
 			}
@@ -94,78 +103,122 @@ impl Drop for Host {
 	}
 }
 
+/// The apartment's state, on its own thread. Commands may run re-entrantly (from a modal loop
+/// inside a driver call), so no borrow is held across a call into a driver.
 #[derive(Debug, Default)]
 struct WorkerContext {
-	next_token_val: usize,
-	drivers: HashMap<Token, driver::SafeHandle>,
-	current_msg: MSG
+	next_token_val: Cell<usize>,
+	// `Rc`, not a clone of the handle: a COM clone is an `AddRef`/`Release` pair, and some
+	// drivers (wineasio) tear their instance down on every `Release`, not only the last.
+	drivers: RefCell<HashMap<Token, Rc<driver::SafeHandle>>>
+}
+
+thread_local! {
+	static WORKER: WorkerContext = WorkerContext::default();
+}
+
+static REGISTER_CLASS: Once = Once::new();
+
+unsafe extern "system" fn window_proc(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
+	if message == WM_APP as u32 {
+		unsafe { WorkerContext::handle_command(wparam, lparam); }
+		return LRESULT(0);
+	}
+	unsafe { DefWindowProcW(window, message, wparam, lparam) }
 }
 
 impl WorkerContext {
-	fn host_sta() {
+	fn host_sta(window: &mpsc::Sender<usize>) {
 		let init_result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
 		assert_eq!(init_result, S_OK, "COM STA initialization on a fresh thread should be infallible");
 
-		Self::default().pump();
+		let handle = Self::create_window();
+		_ = window.send(handle.0 as usize);
+		if !handle.0.is_null() {
+			Self::pump();
+			_ = unsafe { DestroyWindow(handle) };
+		}
 		
+		// Release the drivers while COM is still initialised.
+		let drivers = WORKER.with(|w| w.drivers.take());
+		drop(drivers);
 		unsafe { CoUninitialize(); }
 	}
+	
+	fn create_window() -> HWND {
+		let instance = unsafe { GetModuleHandleW(PCWSTR::null()) };
+		REGISTER_CLASS.call_once(|| {
+			let class = WNDCLASSEXW {
+				cbSize: size_of::<WNDCLASSEXW>() as u32,
+				lpfnWndProc: Some(window_proc),
+				hInstance: instance,
+				lpszClassName: CLASS_NAME,
+				..Default::default()
+			};
+			// A failure shows as the window's creation failing.
+			_ = unsafe { RegisterClassExW(&raw const class) };
+		});
+		unsafe {
+			CreateWindowExW(0, CLASS_NAME, PCWSTR::null(), 0, 0, 0, 0, 0, Some(HWND_MESSAGE), None, Some(instance), None)
+		}
+	}
 
-	fn pump(&mut self) {
+	fn pump() {
+		let mut msg = MSG::default();
 		loop {
-			 // contrary to what the return type suggests, `GetMessageW` is fallible
-			let res = unsafe { GetMessageW(&raw mut self.current_msg, None, 0, 0) };
+			// contrary to what the return type suggests, `GetMessageW` is fallible
+			let res = unsafe { GetMessageW(&raw mut msg, None, 0, 0) };
 			match res.0 {
 				-1 => (), // ignore invalid messages
-				
 				0 => break, // WM_QUIT received
-				
-				_ if self.current_msg.message == WM_APP as u32
-					&& self.current_msg.hwnd.0.is_null()
-					=> unsafe { self.handle_command(); },
-				
-				_ => unsafe { DispatchMessageW(&raw const self.current_msg); }
+				_ => unsafe { DispatchMessageW(&raw const msg); }
 			}
 		}
 	}
 
-	unsafe fn handle_command(&mut self) {
+	unsafe fn handle_command(wparam: WPARAM, lparam: LPARAM) {
 		let command = unsafe {
-			*Box::from_raw(self.current_msg.wParam.0 as *mut Command)
+			*Box::from_raw(wparam.0 as *mut Command)
 		};
+		let out = lparam.0 as *mut ();
 		
 		match command {
 			Command::Create(guid) => {
-				let result = self.try_create_driver(&guid);
-				self.respond(result);
+				let result = Self::try_create_driver(&guid);
+				unsafe { respond(out, result) };
 			}
 			
 			Command::CallMethod(token, method) => {
-				let driver = &self.drivers[&token];
+				// A second `Rc` keeps the driver alive through the call even if a re-entrant
+				// `Release` removes it from the map meanwhile; the driver's own reference
+				// count is not touched.
+				let driver = WORKER
+				.with(|w| w.drivers.borrow().get(&token).cloned())
+				.expect("a proxy's driver lives until the proxy is dropped");
 				
 				match method {
-					Method::Init { window_handle }          => driver.init              (window_handle).pipe(|ret| self.respond(ret)),
-					Method::Name                            => driver.name              (             ).pipe(|ret| self.respond(ret)),
-					Method::Version                         => driver.version           (             ).pipe(|ret| self.respond(ret)),
-					Method::LastError                       => driver.last_error        (             ).pipe(|ret| self.respond(ret)),
-					Method::Start                           => driver.start             (             ).pipe(|ret| self.respond(ret)),
-					Method::Stop                            => driver.stop              (             ).pipe(|ret| self.respond(ret)),
-					Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(|ret| self.respond(ret)),
-					Method::Latencies                       => driver.latencies         (             ).pipe(|ret| self.respond(ret)),
-					Method::BufferSize                      => driver.buffer_size       (             ).pipe(|ret| self.respond(ret)),
-					Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
-					Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(|ret| self.respond(ret)),
-					Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
-					Method::ClockSources                    => driver.clock_sources     (             ).pipe(|ret| self.respond(ret)),
-					Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(|ret| self.respond(ret)),
-					Method::SamplePosition                  => driver.sample_position   (             ).pipe(|ret| self.respond(ret)),
-					Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(|ret| self.respond(ret)),
-					Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(|ret| self.respond(ret)),
-					Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(|ret| self.respond(ret)),
-					Method::OutputReady                     => driver.output_ready      (             ).pipe(|ret| self.respond(ret)),
+					Method::Init { window_handle }          => driver.init              (window_handle).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::Name                            => driver.name              (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::Version                         => driver.version           (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::LastError                       => driver.last_error        (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::Start                           => driver.start             (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::Stop                            => driver.stop              (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::Latencies                       => driver.latencies         (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::BufferSize                      => driver.buffer_size       (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::ClockSources                    => driver.clock_sources     (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::SamplePosition                  => driver.sample_position   (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(|ret| unsafe { respond(out, ret) }),
+					Method::OutputReady                     => driver.output_ready      (             ).pipe(|ret| unsafe { respond(out, ret) }),
 					Method::CreateBuffers { channels, buffer_size, callbacks } => unsafe {
 						let ret = driver.create_buffers(channels, buffer_size, callbacks).map(Iterator::collect::<Vec<_>>);
-						self.respond(ret);
+						respond(out, ret);
 					}
 					Method::Future { selector, opt } => unsafe {
 						driver
@@ -173,40 +226,37 @@ impl WorkerContext {
 						.0
 						.future(selector, opt)
 						.to_result()
-						.pipe(|ret| self.respond(ret));
+						.pipe(|ret| respond(out, ret));
 					},
 				}
 			}
 			
 			Command::Release(token) => {
-				drop(self.drivers.remove(&token));
+				// Taken out first: the driver's release may pump messages, re-entering here.
+				let driver = WORKER.with(|w| w.drivers.borrow_mut().remove(&token));
+				drop(driver);
 			}
 		}
 	}
 
-	fn try_create_driver(&mut self, guid: &GUID) -> WinResult<Token> {
+	fn try_create_driver(guid: &GUID) -> WinResult<Token> {
 		let driver = driver::SafeHandle::new(guid)?;
-		let token = self.create_token();
+		WORKER.with(|w| {
+			let token = Token(w.next_token_val.get());
+			w.next_token_val.set(token.0 + 1);
+			w.drivers.borrow_mut().insert(token, Rc::new(driver));
+			Ok(token)
+		})
+	}
+}
 
-		self.drivers.insert(token, driver);
-		Ok(token)
-	}
-	
-	const fn create_token(&mut self) -> Token {
-		let token = Token(self.next_token_val);
-		self.next_token_val += 1;
-		token
-	}
-
-	fn respond<Response>(&self, response: Response) {
-		_ = unsafe {
-			(self.current_msg.lParam.0 as *mut oneshot::Sender<Response>)
-			.as_mut()
-			.unwrap()
-			.pipe(|ptr| Box::from_raw(ptr))
-			.send(response)
-		};
-	}
+/// Answers a command through the sender its poster boxed into `out`.
+///
+/// # Safety
+/// `out` is the `oneshot::Sender<Response>` [`Host::command_with_response`] boxed for this
+/// command.
+unsafe fn respond<Response>(out: *mut (), response: Response) {
+	_ = unsafe { Box::from_raw(out.cast::<oneshot::Sender<Response>>()) }.send(response);
 }
 
 #[derive(Debug)]

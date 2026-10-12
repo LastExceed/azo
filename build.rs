@@ -22,7 +22,18 @@ fn main() {
 		"WM_APP",
 		"ERROR_INVALID_THREAD_ID",
 		"ERROR_NOT_ENOUGH_QUOTA",
-		"WM_QUIT"
+		"WM_QUIT",
+		"CreateWindowExW",
+		"DefWindowProcW",
+		"DestroyWindow",
+		"RegisterClassExW",
+		"WNDCLASSEXW",
+		"HWND_MESSAGE",
+		"GetModuleHandleW",
+		"PostMessageW",
+		"ERROR_CLASS_ALREADY_EXISTS",
+		"GetLastError",
+		"MSG"
 	])
 	.flat()
 	.dead_code()
