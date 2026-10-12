@@ -113,17 +113,19 @@ impl WorkerContext {
 
 	fn pump(&mut self) {
 		loop {
+			 // contrary to what the return type suggests, `GetMessageW` is fallible
 			let res = unsafe { GetMessageW(&raw mut self.current_msg, None, 0, 0) };
-			if !res.as_bool() {
-				break;
+			match res.0 {
+				-1 => (), // ignore invalid messages
+				
+				0 => break, // WM_QUIT received
+				
+				_ if self.current_msg.message == WM_APP as u32
+					&& self.current_msg.hwnd.0.is_null()
+					=> unsafe { self.handle_command(); },
+				
+				_ => unsafe { DispatchMessageW(&raw const self.current_msg); }
 			}
-			
-			if self.current_msg.message == WM_APP as u32 && self.current_msg.hwnd.0.is_null() {
-				unsafe { self.handle_command(); }
-				continue;
-			}
-			
-			unsafe { DispatchMessageW(&raw const self.current_msg); }
 		}
 	}
 
