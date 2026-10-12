@@ -18,6 +18,7 @@ fn main() {
 		"S_OK",
 		"S_FALSE",
 		"PostThreadMessageW",
+		"RegisterWindowMessageW",
 		"GetThreadId",
 		"WM_USER",
 		"ERROR_INVALID_THREAD_ID",

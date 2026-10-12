@@ -2,16 +2,30 @@ use std::collections::HashMap;
 use std::ffi::{CString, c_long, c_void};
 use std::fmt::Debug;
 use std::os::windows::io::AsRawHandle;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::{ptr, thread};
 use std::time::Duration;
 use tap::Pipe;
-use windows_core::{GUID, WIN32_ERROR};
+use windows_core::{GUID, WIN32_ERROR, w};
 use crate::utils::ResultCodeExt;
 use crate::{WinResult, driver, dto, sys};
 use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::win::*;
+
+/// The thread message that carries a command to the worker.
+///
+/// `WM_USER` is not reserved for us on an STA thread: COM, a driver or the audio stack below it
+/// may post it too, and its `wParam` would then be read as a `Box<Command>`.
+/// A registered message number is unique to this string for the session.
+fn command_message() -> u32 {
+	static ID: OnceLock<u32> = OnceLock::new();
+	*ID.get_or_init(|| {
+		let id = unsafe { RegisterWindowMessageW(w!("azo.host.command")) };
+		assert_ne!(id, 0, "RegisterWindowMessageW should not fail");
+		id
+	})
+}
 
 const POST_MESSAGE_ERRORS: [WIN32_ERROR; 2] = [
 	WIN32_ERROR(ERROR_INVALID_THREAD_ID as _),
@@ -69,7 +83,7 @@ impl Host {
 			let success = unsafe {
 				PostThreadMessageW(
 					self.thread_id,
-					WM_USER as _,
+					command_message(),
 					WPARAM(in_ as _),
 					LPARAM(out as _)
 				)
@@ -118,7 +132,7 @@ impl WorkerContext {
 				break;
 			}
 			
-			if self.current_msg.message == WM_USER as u32 {
+			if self.current_msg.message == command_message() && self.current_msg.hwnd.0.is_null() {
 				unsafe { self.handle_command(); }
 			}
 			
