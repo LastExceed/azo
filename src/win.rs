@@ -6,6 +6,7 @@
     clippy::must_use_candidate,
     clippy::borrow_as_ptr,
     clippy::ptr_as_ptr,
+    clippy::decimal_literal_representation,
     reason = "generated"
 )]
 

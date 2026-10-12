@@ -19,7 +19,7 @@ fn main() {
 		"S_FALSE",
 		"PostThreadMessageW",
 		"GetThreadId",
-		"WM_USER",
+		"WM_APP",
 		"ERROR_INVALID_THREAD_ID",
 		"ERROR_NOT_ENOUGH_QUOTA",
 		"WM_QUIT"

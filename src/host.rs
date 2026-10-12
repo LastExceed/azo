@@ -69,7 +69,7 @@ impl Host {
 			let success = unsafe {
 				PostThreadMessageW(
 					self.thread_id,
-					WM_USER as _,
+					WM_APP as _,
 					WPARAM(in_ as _),
 					LPARAM(out as _)
 				)
@@ -118,7 +118,7 @@ impl WorkerContext {
 				break;
 			}
 			
-			if self.current_msg.message == WM_USER as u32 {
+			if self.current_msg.message == WM_APP as u32 {
 				unsafe { self.handle_command(); }
 			}
 			
