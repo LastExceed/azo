@@ -20,7 +20,7 @@ fn main() {
 		println!();
 
 		#[cfg(feature = "host")]
-		let create_result = host.create_driver(driver_meta.clsid);
+		let create_result = host.create_driver(&driver_meta.clsid);
 		#[cfg(not(feature = "host"))]
 		let create_result = driver::SafeHandle::new(&driver_meta.clsid);
 

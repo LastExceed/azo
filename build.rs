@@ -26,7 +26,6 @@ fn main() {
 		"WM_DESTROY",
 		"ERROR_INVALID_THREAD_ID",
 		"ERROR_NOT_ENOUGH_QUOTA",
-		"WM_QUIT",
 		"GetModuleHandleW",
 		"RegisterClassW",
 		"CreateWindowExW",
