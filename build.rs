@@ -17,12 +17,25 @@ fn main() {
 		"DispatchMessageW",
 		"S_OK",
 		"S_FALSE",
-		"PostThreadMessageW",
+		"SendMessageW",
+		"PostMessageW",
 		"GetThreadId",
+		"WM_NCCREATE",
 		"WM_APP",
+		"WM_CLOSE",
+		"WM_DESTROY",
 		"ERROR_INVALID_THREAD_ID",
 		"ERROR_NOT_ENOUGH_QUOTA",
-		"WM_QUIT"
+		"WM_QUIT",
+		"GetModuleHandleW",
+		"RegisterClassW",
+		"CreateWindowExW",
+		"HWND_MESSAGE",
+		"PostQuitMessage",
+		"DefWindowProcW",
+		"SetWindowLongPtrW",
+		"GetWindowLongPtrW",
+		"GWLP_USERDATA"
 	])
 	.flat()
 	.dead_code()

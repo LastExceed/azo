@@ -1,22 +1,25 @@
 use std::collections::HashMap;
 use std::ffi::{CString, c_long, c_void};
 use std::fmt::Debug;
-use std::os::windows::io::AsRawHandle;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::{ptr, thread};
-use std::time::Duration;
 use tap::Pipe;
-use windows_core::{GUID, WIN32_ERROR};
-use crate::utils::ResultCodeExt;
+use windows_core::{GUID, w};
+use crate::utils::{MAKEINTATOM, ResultCodeExt, SendHWND};
 use crate::{WinResult, driver, dto, sys};
 use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::win::*;
 
-const POST_MESSAGE_ERRORS: [WIN32_ERROR; 2] = [
-	WIN32_ERROR(ERROR_INVALID_THREAD_ID as _),
-	WIN32_ERROR(ERROR_NOT_ENOUGH_QUOTA  as _)
-];
+static WINDOW_CLASS: LazyLock<ATOM> = LazyLock::new(||
+	WNDCLASSW {
+		lpfnWndProc  : Some(window_procedure),
+		hInstance    : unsafe { GetModuleHandleW(None) },
+		lpszClassName: w!("azo-host"),
+		..Default::default()
+	}
+	.pipe(|class| unsafe { RegisterClassW(&raw const class) })
+);
 
 /// A COM STA to create driver instances in, hosted by a dedicated thread driving a message pump.
 /// Provides a mechanism for funneling driver interactions through the apartment owner
@@ -25,19 +28,16 @@ const POST_MESSAGE_ERRORS: [WIN32_ERROR; 2] = [
 /// > ...what?
 /// 
 /// Too much technical jargon? Then [`Host`] is exactly what you need: An abstraction over a bunch of
-/// arcane machinery required for correctness, which consumers of [`azo`](crate) should not have to worry about.
+/// arcane machinery required for correctness and thread safety, which consumers of [`azo`](crate) should not have to worry about.
 #[derive(Debug)]
-pub struct Host {
-	thread_id: u32
-}
+pub struct Host(SendHWND);
 
 impl Host {
 	pub fn new() -> Arc<Self> {
-		thread::spawn(WorkerContext::host_sta)
-		.as_raw_handle()
-		.pipe(HANDLE)
-		.pipe(|handle| unsafe { GetThreadId(handle) })
-		.pipe(|thread_id| Self { thread_id })
+		spawn_worker()
+		.recv()
+		.expect("worker shouldn't drop the sender")
+		.pipe(Self)
 		.pipe(Arc::new)
 	}
 	
@@ -50,122 +50,161 @@ impl Host {
 	}
 	
 	fn command(&self, command: Command) {
-		self.post_message(command, ptr::null_mut());
+		_ = self.send_message(command);
 	}
 	
 	fn command_with_response<Response>(&self, command: Command) -> Response {
-		let (sender, receiver) = oneshot::channel::<Response>();
-		
-		let out_param = Box::new(sender).pipe(Box::into_raw);
-		self.post_message(command, out_param.cast());
-		
-		receiver.recv().expect("worker shouldn't drop the sender")
+		let ptr = self.send_message(command);
+		unsafe { restore_erased(ptr) }
 	}
 	
-	fn post_message(&self, command: Command, out: *mut ()) {
+	fn send_message(&self, command: Command) -> *mut () {
 		let in_ = Box::new(command).pipe(Box::into_raw);
-		
-		loop {
-			let success = unsafe {
-				PostThreadMessageW(
-					self.thread_id,
-					WM_APP as _,
-					WPARAM(in_ as _),
-					LPARAM(out as _)
-				)
-			};
-			
-			if !success.as_bool() {
-				assert!(POST_MESSAGE_ERRORS.contains(&WIN32_ERROR::from_thread()), "undocumented error occurred");
-				// the worker thread is still initializing (or overworked).
-				// In either case, just wait and try again (should only take a few attempts).
-				thread::sleep(Duration::from_nanos(1)); // sleep for as little as possible (1ms by default on win10+)
-				continue;
-			}
-			
-			break;
+
+		unsafe {
+			SendMessageW(
+				self.0.0,
+				WM_APP as _,
+				WPARAM(in_ as _),
+				LPARAM::default()
+			)
 		}
+		.0 as *mut ()
 	}
 }
 
 impl Drop for Host {
 	fn drop(&mut self) {
-		_ = unsafe { PostThreadMessageW(self.thread_id, WM_QUIT as _, WPARAM(0), LPARAM(0)) };
+		_ = unsafe {
+			SendMessageW(
+				self.0.0,
+				WM_CLOSE as _,
+				WPARAM::default(),
+				LPARAM::default()
+			)
+		};
 	}
+}
+
+fn spawn_worker() -> oneshot::Receiver<SendHWND> {
+	let (sender, receiver) = oneshot::channel::<SendHWND>();
+		
+	thread::spawn(move || {
+		let window_handle = unsafe { CreateWindowExW(0, MAKEINTATOM(WINDOW_CLASS.0), None, 0, 0, 0, 0, 0, Some(HWND_MESSAGE), None, None, None) };
+		sender.send(SendHWND(window_handle)).expect("receiver dropped prematurely");
+
+		let mut context = WorkerContext::default();
+		
+		unsafe {
+			SetWindowLongPtrW(
+				window_handle,
+				GWLP_USERDATA,
+				(&raw mut context).expose_provenance().cast_signed()
+			);
+		}
+		
+		let init_result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
+		assert_eq!(init_result, S_OK, "COM STA initialization on a fresh thread should be infallible");
+
+		pump();
+		
+		unsafe { CoUninitialize(); }
+	});
+	
+	receiver
+}
+
+fn pump() {
+	loop {
+		let mut msg = MSG::default();
+		let bool_result = unsafe { GetMessageW(&raw mut msg, None, 0, 0) }; // contrary to what the return type suggests, this is fallible
+		
+		match bool_result.0 {
+			-1 => (), // ignore invalid messages
+			0  => break, // WM_QUIT received	
+			_  => unsafe { DispatchMessageW(&raw const msg); }
+		}
+	}
+}
+
+unsafe extern "system" fn window_procedure(window_handle: HWND, message: u32, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
+	if message as i32 != WM_APP {
+		return unsafe { DefWindowProcW(window_handle, message, w_param, l_param) };
+	}
+	
+	let command =
+		w_param
+		.0
+		.pipe(ptr::with_exposed_provenance_mut::<Command>)
+		.pipe(|ptr| unsafe { Box::from_raw(ptr) });
+
+	unsafe {
+		GetWindowLongPtrW(window_handle, GWLP_USERDATA)
+		.cast_unsigned()
+		.pipe(ptr::with_exposed_provenance_mut::<WorkerContext>)
+		.as_mut()
+		.expect("invalid GWLP_USERDATA")
+		.handle_command(*command)
+		.expose_provenance()
+		.cast_signed()
+		.pipe(LRESULT)
+	}
+}
+
+fn erase_type<T>(value: T) -> *mut () {
+	value
+    .pipe(Box::new)
+	.pipe(Box::into_raw)
+	.cast()
+}
+
+unsafe fn restore_erased<T>(raw_box: *mut ()) -> T {
+	unsafe { *Box::from_raw(raw_box.cast()) }
 }
 
 #[derive(Debug, Default)]
 struct WorkerContext {
 	next_token_val: usize,
-	drivers: HashMap<Token, driver::SafeHandle>,
-	current_msg: MSG
+	drivers: HashMap<Token, driver::SafeHandle>
 }
 
 impl WorkerContext {
-	fn host_sta() {
-		let init_result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
-		assert_eq!(init_result, S_OK, "COM STA initialization on a fresh thread should be infallible");
-
-		Self::default().pump();
-		
-		unsafe { CoUninitialize(); }
-	}
-
-	fn pump(&mut self) {
-		loop {
-			 // contrary to what the return type suggests, `GetMessageW` is fallible
-			let res = unsafe { GetMessageW(&raw mut self.current_msg, None, 0, 0) };
-			match res.0 {
-				-1 => (), // ignore invalid messages
-				
-				0 => break, // WM_QUIT received
-				
-				_ if self.current_msg.message == WM_APP as u32
-					&& self.current_msg.hwnd.0.is_null()
-					=> unsafe { self.handle_command(); },
-				
-				_ => unsafe { DispatchMessageW(&raw const self.current_msg); }
-			}
-		}
-	}
-
-	unsafe fn handle_command(&mut self) {
-		let command = unsafe {
-			*Box::from_raw(self.current_msg.wParam.0 as *mut Command)
-		};
-		
+	fn handle_command(&mut self, command: Command) -> *mut () {
 		match command {
 			Command::Create(guid) => {
-				let result = self.try_create_driver(&guid);
-				self.respond(result);
+				self
+				.try_create_driver(&guid)
+				.pipe(erase_type)
 			}
 			
 			Command::CallMethod(token, method) => {
 				let driver = &self.drivers[&token];
 				
 				match method {
-					Method::Init { window_handle }          => driver.init              (window_handle).pipe(|ret| self.respond(ret)),
-					Method::Name                            => driver.name              (             ).pipe(|ret| self.respond(ret)),
-					Method::Version                         => driver.version           (             ).pipe(|ret| self.respond(ret)),
-					Method::LastError                       => driver.last_error        (             ).pipe(|ret| self.respond(ret)),
-					Method::Start                           => driver.start             (             ).pipe(|ret| self.respond(ret)),
-					Method::Stop                            => driver.stop              (             ).pipe(|ret| self.respond(ret)),
-					Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(|ret| self.respond(ret)),
-					Method::Latencies                       => driver.latencies         (             ).pipe(|ret| self.respond(ret)),
-					Method::BufferSize                      => driver.buffer_size       (             ).pipe(|ret| self.respond(ret)),
-					Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
-					Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(|ret| self.respond(ret)),
-					Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(|ret| self.respond(ret)),
-					Method::ClockSources                    => driver.clock_sources     (             ).pipe(|ret| self.respond(ret)),
-					Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(|ret| self.respond(ret)),
-					Method::SamplePosition                  => driver.sample_position   (             ).pipe(|ret| self.respond(ret)),
-					Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(|ret| self.respond(ret)),
-					Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(|ret| self.respond(ret)),
-					Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(|ret| self.respond(ret)),
-					Method::OutputReady                     => driver.output_ready      (             ).pipe(|ret| self.respond(ret)),
+					Method::Init { window_handle }          => driver.init              (window_handle).pipe(erase_type),
+					Method::Name                            => driver.name              (             ).pipe(erase_type),
+					Method::Version                         => driver.version           (             ).pipe(erase_type),
+					Method::LastError                       => driver.last_error        (             ).pipe(erase_type),
+					Method::Start                           => driver.start             (             ).pipe(erase_type),
+					Method::Stop                            => driver.stop              (             ).pipe(erase_type),
+					Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(erase_type),
+					Method::Latencies                       => driver.latencies         (             ).pipe(erase_type),
+					Method::BufferSize                      => driver.buffer_size       (             ).pipe(erase_type),
+					Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(erase_type),
+					Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(erase_type),
+					Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(erase_type),
+					Method::ClockSources                    => driver.clock_sources     (             ).pipe(erase_type),
+					Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(erase_type),
+					Method::SamplePosition                  => driver.sample_position   (             ).pipe(erase_type),
+					Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(erase_type),
+					Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(erase_type),
+					Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(erase_type),
+					Method::OutputReady                     => driver.output_ready      (             ).pipe(erase_type),
 					Method::CreateBuffers { channels, buffer_size, callbacks } => unsafe {
-						let ret = driver.create_buffers(channels, buffer_size, callbacks).map(Iterator::collect::<Vec<_>>);
-						self.respond(ret);
+						driver
+						.create_buffers(channels, buffer_size, callbacks)
+						.map(Iterator::collect::<Vec<_>>)
+						.pipe(erase_type)
 					}
 					Method::Future { selector, opt } => unsafe {
 						driver
@@ -173,13 +212,14 @@ impl WorkerContext {
 						.0
 						.future(selector, opt)
 						.to_result()
-						.pipe(|ret| self.respond(ret));
-					},
+						.pipe(erase_type)
+					}
 				}
 			}
 			
 			Command::Release(token) => {
 				drop(self.drivers.remove(&token));
+				ptr::null_mut()
 			}
 		}
 	}
@@ -196,16 +236,6 @@ impl WorkerContext {
 		let token = Token(self.next_token_val);
 		self.next_token_val += 1;
 		token
-	}
-
-	fn respond<Response>(&self, response: Response) {
-		_ = unsafe {
-			(self.current_msg.lParam.0 as *mut oneshot::Sender<Response>)
-			.as_mut()
-			.unwrap()
-			.pipe(|ptr| Box::from_raw(ptr))
-			.send(response)
-		};
 	}
 }
 
