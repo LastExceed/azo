@@ -1,7 +1,7 @@
 pub mod driver;
 pub mod dto;
 pub mod future;
-pub mod utils;
+mod utils;
 pub mod win;
 #[cfg(feature = "host")]
 mod host;
@@ -13,6 +13,8 @@ use sys::ResultCode;
 pub use windows_core;
 pub use azo_sys as sys;
 pub use win::HWND;
+#[cfg(feature = "host")]
+pub use self::host::Host;
 
 /// Represents an error returned by an ASIO driver.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
