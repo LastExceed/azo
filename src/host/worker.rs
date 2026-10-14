@@ -31,21 +31,9 @@ pub fn spawn() -> oneshot::Receiver<SendHWND> {
 		sender.send(SendHWND(window_handle)).expect("receiver dropped prematurely");
 
 		let mut context = Context::default();
-		
-		unsafe {
-			SetWindowLongPtrW(
-				window_handle,
-				GWLP_USERDATA,
-				(&raw mut context).expose_provenance().cast_signed()
-			);
-		}
-		
-		let init_result = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
-		assert_eq!(init_result, S_OK, "COM STA initialization on a fresh thread should be infallible");
+		context.set(window_handle);
 
 		pump();
-		
-		unsafe { CoUninitialize(); }
 	});
 	
 	receiver
@@ -95,6 +83,17 @@ struct Context {
 }
 
 impl Context {
+	fn set(&mut self, window_handle: HWND) {
+		let self_raw: *mut Self = self; // prefer coercing over casting
+		unsafe {
+			SetWindowLongPtrW(
+				window_handle,
+				GWLP_USERDATA,
+				self_raw.expose_provenance().cast_signed()
+			);
+		}
+	}
+	
 	fn get<'ctx>(window_handle: HWND) -> &'ctx mut Self {
 		unsafe {
 			GetWindowLongPtrW(window_handle, GWLP_USERDATA)
