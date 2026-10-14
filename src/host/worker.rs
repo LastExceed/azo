@@ -5,10 +5,12 @@ use std::sync::LazyLock;
 use std::{ptr, thread};
 use tap::Pipe;
 use windows_core::{GUID, w};
-use crate::utils::{MAKEINTATOM, ResultCodeExt, SendHWND};
+use crate::host::utils::MAKEINTATOM;
+use crate::utils::ResultCodeExt;
 use crate::driver::{self, Driver};
 use crate::win::*;
 
+use super::utils::SendHWND;
 use super::{Method, Token, WM_CALL_METHOD, WM_CREATE_DRIVER, WM_RELEASE_DRIVER};
 
 static WINDOW_CLASS: LazyLock<ATOM> = LazyLock::new(||

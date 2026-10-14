@@ -6,7 +6,7 @@ use azo::sys::*;
 use azo::future::*;
 
 #[cfg(feature = "host")]
-use azo::utils::Host;
+use azo::Host;
 
 fn main() {
 	#[cfg(feature = "host")]

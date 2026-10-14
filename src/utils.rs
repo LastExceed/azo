@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString};
 use std::num::NonZeroI32;
 use azo_sys::ResultCode;
 use crate::Error;
-use windows_core::{GUID, Interface, PCWSTR};
+use windows_core::{GUID, Interface};
 use crate::win::*;
 
 /// Same as [`Interface::cast`], except that the target interface's IID is decoupled from its type.
@@ -41,20 +41,3 @@ impl ResultCodeExt for ResultCode {
         self.to_result().map(|()| ok_fn())
     }
 }
-
-/// <https://github.com/microsoft/windows-rs/issues/3589>
-#[cfg(feature = "host")]
-#[expect(non_snake_case, reason = "match Windows SDK")]
-pub const fn MAKEINTATOM(value: u16) -> PCWSTR {
-    PCWSTR::from_raw(value as _)
-}
-
-/// A [`HWND`] that is [`Send`].
-#[cfg(feature = "host")]
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct SendHWND(pub HWND);
-
-// SAFETY:
-// This should be in windows-rs tbh
-#[cfg(feature = "host")]
-unsafe impl Send for SendHWND {}

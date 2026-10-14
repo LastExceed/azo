@@ -1,4 +1,4 @@
-#![expect(
+#![allow(
     non_snake_case,
     trivial_casts,
     clippy::absolute_paths,

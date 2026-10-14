@@ -1,3 +1,4 @@
+mod utils;
 mod worker;
 
 use std::ffi::{CString, c_long, c_void};
@@ -6,11 +7,12 @@ use std::mem::MaybeUninit;
 use std::sync::Arc;
 use tap::Pipe;
 use windows_core::GUID;
-use crate::utils::SendHWND;
 use crate::{WinResult, dto, sys};
 use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::win::*;
+
+use self::utils::SendHWND;
 
 const WM_CREATE_DRIVER : i32 = WM_APP;
 const WM_CALL_METHOD   : i32 = WM_APP + 1;
