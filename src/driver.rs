@@ -5,8 +5,8 @@ use std::{mem, ptr};
 use crate::{WinResult, dto, sys};
 use crate::dto::Granularity;
 use crate::future::AsioFuture;
-use crate::utils::{ResultCodeExt, cast_decoupled, cstring_from_bytes_until_nul};
-use crate::win::{CLSCTX_SERVER, COINIT_APARTMENTTHREADED, CoCreateInstance, CoInitializeEx, CoUninitialize, HWND, S_FALSE};
+use crate::utils::{COMInit, ResultCodeExt, cast_decoupled, cstring_from_bytes_until_nul};
+use crate::win::{CLSCTX_SERVER, CoCreateInstance, HWND};
 use sys::IIASIORedecl;
 use tap::Pipe;
 use windows_core::{GUID, HSTRING, IUnknown};
@@ -153,31 +153,14 @@ impl Metadata {
 /// A safe, [`Clone`]able handle to a driver instance.
 /// This type is ! [`Send`] because the driver instance lives in a single-threaded COM apartment.
 /// [`crate::utils::Host`] provides the necessary machinery to get around this limitation.
-#[derive(Debug, PartialEq, Eq)]
-pub struct SafeHandle(UnsafeHandle);
-
-impl Clone for SafeHandle {
-	fn clone(&self) -> Self {
-		// increment the ref count
-		let hresult = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
-		assert_eq!(hresult, S_FALSE, "COM should be initialized as STA");
-		
-		Self(self.0.clone())
-	}
-}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SafeHandle(UnsafeHandle, COMInit); // significant drop-order!
 
 impl SafeHandle {
 	pub fn new(clsid: &GUID) -> WinResult<Self> {
-		let hresult = unsafe { CoInitializeEx(None, COINIT_APARTMENTTHREADED as _) };
-		if !hresult.is_ok() {
-			return Err(hresult.into());
-		}
-		
-		// SAFETY:
-		// COM is now initialized, and gets uninitialized in the `Drop` implementation of `Self`
-		unsafe { UnsafeHandle::new(clsid) }?
-    	.pipe(Self)
-		.pipe(Ok)
+		let com = COMInit::new()?;
+		let inner = unsafe { UnsafeHandle::new(clsid) }?;
+		Ok(Self(inner, com))
 	}
 	
 	/// # Safety
@@ -185,12 +168,6 @@ impl SafeHandle {
 	#[must_use]
 	pub const unsafe fn as_unsafe(&self) -> &UnsafeHandle {
 		&self.0
-	}
-}
-
-impl Drop for SafeHandle {
-	fn drop(&mut self) {
-		unsafe { CoUninitialize(); }
 	}
 }
 
