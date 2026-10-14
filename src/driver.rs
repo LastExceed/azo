@@ -152,7 +152,7 @@ impl Metadata {
 
 /// A safe, [`Clone`]able handle to a driver instance.
 /// This type is ! [`Send`] because the driver instance lives in a single-threaded COM apartment.
-/// [`crate::utils::Host`] provides the necessary machinery to get around this limitation.
+/// [`crate::Host`] provides the necessary machinery to get around this limitation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SafeHandle(UnsafeHandle, COMInit); // significant drop-order!
 
