@@ -9,8 +9,9 @@ pub const fn MAKEINTATOM(value: u16) -> PCWSTR {
 
 /// A [`HWND`] that is [`Send`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct SendHWND(pub HWND);
+pub struct SendSyncHWND(pub HWND);
 
 // SAFETY:
 // This should be in windows-rs tbh
-unsafe impl Send for SendHWND {}
+unsafe impl Send for SendSyncHWND {}
+unsafe impl Sync for SendSyncHWND {}

@@ -12,7 +12,7 @@ use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::win::*;
 
-use self::utils::SendHWND;
+use self::utils::SendSyncHWND;
 
 const WM_CREATE_DRIVER : i32 = WM_APP;
 const WM_CALL_METHOD   : i32 = WM_APP + 1;
@@ -57,7 +57,7 @@ struct Token(usize);
 /// Too much technical jargon? Then [`Host`] is exactly what you need: An abstraction over a bunch of
 /// arcane machinery required for correctness and thread safety, which consumers of [`azo`](crate) should not have to worry about.
 #[derive(Debug)]
-pub struct Host(SendHWND);
+pub struct Host(SendSyncHWND);
 
 impl Host {
 	pub fn new() -> Arc<Self> {

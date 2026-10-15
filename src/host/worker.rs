@@ -10,7 +10,7 @@ use crate::utils::ResultCodeExt;
 use crate::driver::{self, Driver};
 use crate::win::*;
 
-use super::utils::SendHWND;
+use super::utils::SendSyncHWND;
 use super::{Method, Token, WM_CALL_METHOD, WM_CREATE_DRIVER, WM_RELEASE_DRIVER};
 
 static WINDOW_CLASS: LazyLock<ATOM> = LazyLock::new(||
@@ -23,12 +23,12 @@ static WINDOW_CLASS: LazyLock<ATOM> = LazyLock::new(||
 	.pipe(|class| unsafe { RegisterClassW(&raw const class) })
 );
 
-pub fn spawn() -> oneshot::Receiver<SendHWND> {
-	let (sender, receiver) = oneshot::channel::<SendHWND>();
+pub fn spawn() -> oneshot::Receiver<SendSyncHWND> {
+	let (sender, receiver) = oneshot::channel::<SendSyncHWND>();
 		
 	thread::spawn(move || {
 		let window_handle = unsafe { CreateWindowExW(0, MAKEINTATOM(WINDOW_CLASS.0), None, 0, 0, 0, 0, 0, Some(HWND_MESSAGE), None, None, None) };
-		sender.send(SendHWND(window_handle)).expect("receiver dropped prematurely");
+		sender.send(SendSyncHWND(window_handle)).expect("receiver dropped prematurely");
 
 		let mut context = Context::default();
 		context.set(window_handle);
