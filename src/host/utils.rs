@@ -7,7 +7,7 @@ pub const fn MAKEINTATOM(value: u16) -> PCWSTR {
     PCWSTR::from_raw(value as _)
 }
 
-/// A [`HWND`] that is [`Send`].
+/// A [`HWND`] that is [`Send`] and [`Sync`].
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct SendSyncHWND(pub HWND);
 
