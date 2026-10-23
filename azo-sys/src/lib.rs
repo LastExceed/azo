@@ -139,8 +139,8 @@ impl ResultCode {
     }
 }
 
-#[repr(C)]
-#[derive(Debug, Clone, PartialEq)]
+#[repr(C, packed(4))]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TimeCode {
 	pub speed: c_double,
 	pub time_code_samples: Samples,
@@ -182,8 +182,8 @@ bitflags! {
 	}
 }
 
-#[repr(C)]
-#[derive(Debug, Default, Clone, PartialEq)]
+#[repr(C, packed(4))]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub struct TimeInfo {
 	pub speed          : c_double,
 	pub system_time    : TimeStamp,
@@ -207,7 +207,7 @@ bitflags! {
 	}
 }
 
-#[repr(C)]
+#[repr(C, packed(4))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Time {
     pub _reserved: [c_long; 4],
@@ -246,7 +246,7 @@ pub type BufferSwitchTimeInfo =
 		direct_process     : Bool
 	) -> *mut Time;
 
-#[repr(C)]
+#[repr(C, packed(4))]
 #[derive(Debug, Clone, Hash)]
 pub struct Callbacks {
     pub buffer_switch          : BufferSwitch,
@@ -359,7 +359,7 @@ pub struct ChannelInfo {
 	pub name         : [u8; 32]
 }
 
-#[repr(C)]
+#[repr(C, packed(4))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BufferInfo {
 	pub is_input   : Bool,

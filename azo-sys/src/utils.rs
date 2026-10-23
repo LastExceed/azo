@@ -56,6 +56,7 @@ macro_rules! c_enum {
 	}
 }
 
+#[repr(C)]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct I64Split {
 	pub hi: u32,
