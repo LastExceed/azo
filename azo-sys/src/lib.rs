@@ -140,7 +140,7 @@ impl ResultCode {
 }
 
 #[repr(C, packed(4))]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TimeCode {
 	pub speed: c_double,
 	pub time_code_samples: Samples,
@@ -183,7 +183,7 @@ bitflags! {
 }
 
 #[repr(C, packed(4))]
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct TimeInfo {
 	pub speed          : c_double,
 	pub system_time    : TimeStamp,
@@ -207,7 +207,7 @@ bitflags! {
 	}
 }
 
-#[repr(C, packed(4))]
+#[repr(C)]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Time {
     pub _reserved: [c_long; 4],
