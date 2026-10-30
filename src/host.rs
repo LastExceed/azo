@@ -3,7 +3,6 @@ mod worker;
 
 use std::ffi::{CString, c_long, c_void};
 use std::fmt::Debug;
-use std::mem::MaybeUninit;
 use std::sync::Arc;
 use tap::Pipe;
 use windows_core::GUID;
@@ -12,7 +11,8 @@ use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::win::*;
 
-use self::utils::SendSyncHWND;
+use self::utils::DataExchange;
+use self::worker::Worker;
 
 const WM_CREATE_DRIVER : i32 = WM_APP;
 const WM_CALL_METHOD   : i32 = WM_APP + 1;
@@ -57,13 +57,11 @@ struct Token(usize);
 /// Too much technical jargon? Then [`Host`] is exactly what you need: An abstraction over a bunch of
 /// arcane machinery required for correctness and thread safety, which consumers of [`azo`](crate) should not have to worry about.
 #[derive(Debug)]
-pub struct Host(SendSyncHWND);
+pub struct Host(Worker);
 
 impl Host {
 	pub fn new() -> Arc<Self> {
-		worker::spawn()
-		.recv()
-		.expect("worker shouldn't drop the sender")
+		Worker::new()
 		.pipe(Self)
 		.pipe(Arc::new)
 	}
@@ -71,66 +69,22 @@ impl Host {
 	/// Creates an instance of a driver in this host's STA and returns a [`Proxy`] for interacting with that driver,
 	/// which can be freely shared between threads without restrictions.
 	pub fn create_driver(self: &Arc<Self>, guid: &GUID) -> WinResult<Proxy> {
-		let guid_raw: *const _ = guid; // coerce to raw ptr
-		let mut result = MaybeUninit::<WinResult<Token>>::uninit();
-		
-		self.send(
-			WM_CREATE_DRIVER,
-			guid_raw.expose_provenance(),
-			(&raw mut result).expose_provenance().cast_signed()
-		);
-		
-		unsafe { result.assume_init() }
-		.map(|token| Proxy {
-			token,
-			host: Arc::clone(self)
-		})
+		unsafe { self.exchange_data::<&GUID, WinResult<Token>>(WM_CREATE_DRIVER, guid) }
+		.map(|token| Proxy { token, host: Arc::clone(self) })
 	}
 	
 	fn call_method<Response>(&self, token: Token, method: Method) -> Response {
-		let mut in_ = Some((token, method));
-		let mut out = MaybeUninit::<Response>::uninit();
-
-		self.send(
-			WM_CALL_METHOD,
-			(&raw mut in_).expose_provenance(),
-			(&raw mut out).expose_provenance().cast_signed()
-		);
-		
-		unsafe { out.assume_init() }
+		unsafe { self.exchange_data::<_, Response>(WM_CALL_METHOD, (token, method)) }
 	}
 	
-	fn release_driver(&self, token: Token) {
-		_ = self.post(WM_RELEASE_DRIVER, token.0);
-	}
-
-	fn send(&self, message: i32, w_param: usize, l_param: isize) {
-		unsafe {
-			SendMessageW(
-				self.0.0,
-				message as _,
-				WPARAM(w_param),
-				LPARAM(l_param)
-			);
-		}
+	unsafe fn exchange_data<Request, Response>(&self, message: i32, request: Request) -> Response {
+		let mut data_exchange = DataExchange::<Request, Response>::new(request);
+		self.0.send(message, (&raw mut data_exchange).expose_provenance());
+		unsafe { data_exchange.take_response() }
 	}
 	
-	fn post(&self, message: i32, w_param: usize) -> WinResult<()> {
-		unsafe {
-			PostMessageW(
-				Some(self.0.0),
-				message as _,
-				WPARAM(w_param),
-				LPARAM::default()
-			)
-		}
-		.ok()
-	}
-}
-
-impl Drop for Host {
-	fn drop(&mut self) {
-		_ = self.post(WM_CLOSE, 0);
+	fn release_driver(&self, token: Token) -> WinResult<()> {
+		self.0.post(WM_RELEASE_DRIVER, token.0)
 	}
 }
 
@@ -155,7 +109,7 @@ impl Proxy {
 
 impl Drop for Proxy {
 	fn drop(&mut self) {
-		self.host.release_driver(self.token);
+		_ = self.host.release_driver(self.token);
 	}
 }
 

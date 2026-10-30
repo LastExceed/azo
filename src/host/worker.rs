@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::mem::MaybeUninit;
 use std::sync::LazyLock;
 use std::{ptr, thread};
 use tap::Pipe;
@@ -8,9 +7,9 @@ use windows_core::{GUID, w};
 use crate::host::utils::MAKEINTATOM;
 use crate::utils::ResultCodeExt;
 use crate::driver::{self, Driver};
-use crate::win::*;
+use crate::{WinResult, win::*};
 
-use super::utils::SendSyncHWND;
+use super::utils::{DataExchange, SendSyncHWND};
 use super::{Method, Token, WM_CALL_METHOD, WM_CREATE_DRIVER, WM_RELEASE_DRIVER};
 
 static WINDOW_CLASS: LazyLock<ATOM> = LazyLock::new(||
@@ -23,20 +22,57 @@ static WINDOW_CLASS: LazyLock<ATOM> = LazyLock::new(||
 	.pipe(|class| unsafe { RegisterClassW(&raw const class) })
 );
 
-pub fn spawn() -> oneshot::Receiver<SendSyncHWND> {
-	let (sender, receiver) = oneshot::channel::<SendSyncHWND>();
+#[derive(Debug)]
+pub struct Worker(SendSyncHWND);
+
+impl Worker {
+	pub fn new() -> Self {
+		let (sender, receiver) = oneshot::channel::<SendSyncHWND>();
 		
-	thread::spawn(move || {
-		let window_handle = unsafe { CreateWindowExW(0, MAKEINTATOM(WINDOW_CLASS.0), None, 0, 0, 0, 0, 0, Some(HWND_MESSAGE), None, None, None) };
-		sender.send(SendSyncHWND(window_handle)).expect("receiver dropped prematurely");
+		thread::spawn(move || {
+			let window_handle = unsafe { CreateWindowExW(0, MAKEINTATOM(WINDOW_CLASS.0), None, 0, 0, 0, 0, 0, Some(HWND_MESSAGE), None, None, None) };
+			sender.send(SendSyncHWND(window_handle)).expect("host should not drop the receiver");
 
-		let mut context = Context::default();
-		context.set(window_handle);
+			let mut context = Context::default();
+			context.set(window_handle);
 
-		pump();
-	});
+			pump();
+		});
+		
+		receiver
+			.recv()
+			.expect("worker should not drop the sender")
+			.pipe(Self)
+	}
 	
-	receiver
+	pub fn send(&self, message: i32, w_param: usize) {
+		unsafe {
+			SendMessageW(
+				self.0.0,
+				message as _,
+				WPARAM(w_param),
+				LPARAM::default()
+			);
+		}
+	}
+	
+	pub fn post(&self, message: i32, w_param: usize) -> WinResult<()> {
+		unsafe {
+			PostMessageW(
+				Some(self.0.0),
+				message as _,
+				WPARAM(w_param),
+				LPARAM::default()
+			)
+		}
+		.ok()
+	}
+}
+
+impl Drop for Worker {
+	fn drop(&mut self) {
+		_ = self.post(WM_CLOSE, 0);
+	}
 }
 
 fn pump() {
@@ -52,28 +88,18 @@ fn pump() {
 	}
 }
 
-unsafe extern "system" fn window_procedure(window_handle: HWND, message: u32, in_: WPARAM, out: LPARAM) -> LRESULT {
+unsafe extern "system" fn window_procedure(window_handle: HWND, message: u32, w_param: WPARAM, l_param: LPARAM) -> LRESULT {
 	// cannot get the context before matching the message since it might not exist yet (WM_NCCREATE, WM_CREATE, ...)
-	#[deny(nonstandard_style, reason = "prevent accidental wildcard parrterns")]
+	#[deny(nonstandard_style, reason = "prevent accidental wildcard patterns")]
 	match message as i32 {
-		WM_CREATE_DRIVER  => Context::get(window_handle).create_driver (in_, out),
-		WM_CALL_METHOD    => Context::get(window_handle).call_method   (in_, out),
-		WM_RELEASE_DRIVER => Context::get(window_handle).release_driver(in_),
+		WM_CREATE_DRIVER  => Context::get(window_handle).create_driver (w_param),
+		WM_CALL_METHOD    => Context::get(window_handle).call_method   (w_param),
+		WM_RELEASE_DRIVER => Context::get(window_handle).release_driver(w_param),
 		WM_DESTROY        => unsafe { PostQuitMessage(0) },
-		_                 => return unsafe { DefWindowProcW(window_handle, message, in_, out) }
+		_                 => return unsafe { DefWindowProcW(window_handle, message, w_param, l_param) }
 	}
 
 	LRESULT::default()
-}
-
-fn write_response<Out>(l_param: LPARAM, value: Out) {
-	l_param
-	.0
-	.cast_unsigned()
-	.pipe(ptr::with_exposed_provenance_mut::<MaybeUninit<Out>>)
-	.pipe(|ptr| unsafe { ptr.as_mut() })
-	.expect("invalid LParam")
-	.write(value);
 }
 
 #[derive(Debug, Default)]
@@ -84,12 +110,11 @@ struct Context {
 
 impl Context {
 	fn set(&mut self, window_handle: HWND) {
-		let self_raw: *mut Self = self; // prefer coercing over casting
 		unsafe {
 			SetWindowLongPtrW(
 				window_handle,
 				GWLP_USERDATA,
-				self_raw.expose_provenance().cast_signed()
+				<*mut _>::expose_provenance(self).cast_signed()
 			);
 		}
 	}
@@ -104,15 +129,16 @@ impl Context {
 		}
 	}
 	
-	fn create_driver(&mut self, in_: WPARAM, out: LPARAM) {
-		in_
-		.0
-		.pipe(ptr::with_exposed_provenance::<GUID>)
-		.pipe(|ptr| unsafe { ptr.as_ref() })
-		.expect("invalid WParam")
+	fn create_driver(&mut self, w_param: WPARAM) {
+		let data_exchange = unsafe {
+			ptr::with_exposed_provenance_mut::<DataExchange<&GUID, WinResult<Token>>>(w_param.0)
+			.as_mut_unchecked()
+		};
+		
+		unsafe { data_exchange.take_request() }
 		.pipe(driver::SafeHandle::new)
 		.map(|driver| self.register_driver(driver))
-		.pipe(|result| write_response(out, result));
+		.pipe(|result| data_exchange.write_response(result));
 	}
 	
 	fn register_driver(&mut self, driver: driver::SafeHandle) -> Token {
@@ -120,50 +146,46 @@ impl Context {
 		self.drivers.insert(token, driver);
 		token
 	}
-	
+
 	const fn create_token(&mut self) -> Token {
 		let token = Token(self.next_token_val);
 		self.next_token_val += 1;
 		token
 	}
 	
-	fn call_method(&self, in_: WPARAM, out: LPARAM) {
-		let (token, method) =
-			in_
-			.0
-			.pipe(ptr::with_exposed_provenance_mut::<Option<(Token, Method)>>)
-			.pipe(|ptr| unsafe { ptr.as_mut() })
-			.expect("invalid WParam")
-			.take()
-			.expect("command missing");
-		
+	fn call_method(&self, w_param: WPARAM) {
+		// cannot use the [`DataExchange`] union here,
+		// as the `Response` type depends on the request value
+		let ptr = ptr::with_exposed_provenance_mut::<(_, _)>(w_param.0);
+
+		let (token, method) = unsafe { ptr.read() };
 		let driver = &self.drivers[&token];
-				
+
 		match method {
-			Method::Init { window_handle }          => driver.init              (window_handle).pipe(|ret| write_response(out, ret)),
-			Method::Name                            => driver.name              (             ).pipe(|ret| write_response(out, ret)),
-			Method::Version                         => driver.version           (             ).pipe(|ret| write_response(out, ret)),
-			Method::LastError                       => driver.last_error        (             ).pipe(|ret| write_response(out, ret)),
-			Method::Start                           => driver.start             (             ).pipe(|ret| write_response(out, ret)),
-			Method::Stop                            => driver.stop              (             ).pipe(|ret| write_response(out, ret)),
-			Method::ChannelCounts                   => driver.channel_counts    (             ).pipe(|ret| write_response(out, ret)),
-			Method::Latencies                       => driver.latencies         (             ).pipe(|ret| write_response(out, ret)),
-			Method::BufferSize                      => driver.buffer_size       (             ).pipe(|ret| write_response(out, ret)),
-			Method::CanSampleRate { sample_rate }   => driver.can_sample_rate   (sample_rate  ).pipe(|ret| write_response(out, ret)),
-			Method::GetSampleRate                   => driver.get_sample_rate   (             ).pipe(|ret| write_response(out, ret)),
-			Method::SetSampleRate { sample_rate }   => driver.set_sample_rate   (sample_rate  ).pipe(|ret| write_response(out, ret)),
-			Method::ClockSources                    => driver.clock_sources     (             ).pipe(|ret| write_response(out, ret)),
-			Method::SetClockSource { clock_source } => driver.set_clock_source  (clock_source ).pipe(|ret| write_response(out, ret)),
-			Method::SamplePosition                  => driver.sample_position   (             ).pipe(|ret| write_response(out, ret)),
-			Method::ChannelInfo { channel_id }      => driver.channel_info      (channel_id   ).pipe(|ret| write_response(out, ret)),
-			Method::DisposeBuffers                  => driver.dispose_buffers   (             ).pipe(|ret| write_response(out, ret)),
-			Method::OpenControlPanel                => driver.open_control_panel(             ).pipe(|ret| write_response(out, ret)),
-			Method::OutputReady                     => driver.output_ready      (             ).pipe(|ret| write_response(out, ret)),
+			Method::Init { window_handle }          => unsafe { *ptr.cast() = driver.init              (window_handle) },
+			Method::Name                            => unsafe { *ptr.cast() = driver.name              (             ) },
+			Method::Version                         => unsafe { *ptr.cast() = driver.version           (             ) },
+			Method::LastError                       => unsafe { *ptr.cast() = driver.last_error        (             ) },
+			Method::Start                           => unsafe { *ptr.cast() = driver.start             (             ) },
+			Method::Stop                            => unsafe { *ptr.cast() = driver.stop              (             ) },
+			Method::ChannelCounts                   => unsafe { *ptr.cast() = driver.channel_counts    (             ) },
+			Method::Latencies                       => unsafe { *ptr.cast() = driver.latencies         (             ) },
+			Method::BufferSize                      => unsafe { *ptr.cast() = driver.buffer_size       (             ) },
+			Method::CanSampleRate { sample_rate }   => unsafe { *ptr.cast() = driver.can_sample_rate   (sample_rate  ) },
+			Method::GetSampleRate                   => unsafe { *ptr.cast() = driver.get_sample_rate   (             ) },
+			Method::SetSampleRate { sample_rate }   => unsafe { *ptr.cast() = driver.set_sample_rate   (sample_rate  ) },
+			Method::ClockSources                    => unsafe { *ptr.cast() = driver.clock_sources     (             ) },
+			Method::SetClockSource { clock_source } => unsafe { *ptr.cast() = driver.set_clock_source  (clock_source ) },
+			Method::SamplePosition                  => unsafe { *ptr.cast() = driver.sample_position   (             ) },
+			Method::ChannelInfo { channel_id }      => unsafe { *ptr.cast() = driver.channel_info      (channel_id   ) },
+			Method::DisposeBuffers                  => unsafe { *ptr.cast() = driver.dispose_buffers   (             ) },
+			Method::OpenControlPanel                => unsafe { *ptr.cast() = driver.open_control_panel(             ) },
+			Method::OutputReady                     => unsafe { *ptr.cast() = driver.output_ready      (             ) },
 			Method::CreateBuffers { channels, buffer_size, callbacks } => unsafe {
 				driver
 				.create_buffers(channels, buffer_size, callbacks)
 				.map(Iterator::collect::<Vec<_>>)
-				.pipe(|ret| write_response(out, ret));
+				.pipe(|ret| *ptr.cast() = ret);
 			},
 			Method::Future { selector, opt } => unsafe {
 				driver
@@ -171,12 +193,16 @@ impl Context {
 				.0
 				.future(selector, opt)
 				.to_result()
-				.pipe(|ret| write_response(out, ret));
+				.pipe(|ret| *ptr.cast() = ret);
 			},
 		}
 	}
 	
-	fn release_driver(&mut self, in_: WPARAM) {
-		drop(self.drivers.remove(&Token(in_.0)));
+	fn release_driver(&mut self, w_param: WPARAM) {
+		w_param
+		.0
+		.pipe(Token)
+		.pipe(|token| self.drivers.remove(&token))
+		.pipe(drop);
 	}
 }
