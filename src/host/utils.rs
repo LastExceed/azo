@@ -41,3 +41,18 @@ impl<Request, Response> DataExchange<Request, Response> {
 		unsafe { ManuallyDrop::take(&mut self.response) }
 	}
 }
+
+/// Identifies a hosted driver instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Token(pub usize);
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct TokenGenerator(usize);
+
+impl TokenGenerator {
+	pub const fn new_token(&mut self) -> Token {
+		let token = Token(self.0);
+		self.0 += 1;
+		token
+	}
+}

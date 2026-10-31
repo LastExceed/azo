@@ -9,7 +9,7 @@ use crate::utils::ResultCodeExt;
 use crate::driver::{self, Driver};
 use crate::{WinResult, win::*};
 
-use super::utils::{DataExchange, SendSyncHWND};
+use super::utils::{DataExchange, SendSyncHWND, TokenGenerator};
 use super::{Method, Token, WM_CALL_METHOD, WM_CREATE_DRIVER, WM_RELEASE_DRIVER};
 
 static WINDOW_CLASS: LazyLock<ATOM> = LazyLock::new(||
@@ -104,7 +104,7 @@ unsafe extern "system" fn window_procedure(window_handle: HWND, message: u32, w_
 
 #[derive(Debug, Default)]
 struct Context {
-	next_token_val: usize,
+	token_generator: TokenGenerator,
 	drivers: HashMap<Token, driver::SafeHandle>
 }
 
@@ -142,14 +142,8 @@ impl Context {
 	}
 	
 	fn register_driver(&mut self, driver: driver::SafeHandle) -> Token {
-		let token = self.create_token();
+		let token = self.token_generator.new_token();
 		self.drivers.insert(token, driver);
-		token
-	}
-
-	const fn create_token(&mut self) -> Token {
-		let token = Token(self.next_token_val);
-		self.next_token_val += 1;
 		token
 	}
 	

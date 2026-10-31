@@ -11,7 +11,7 @@ use crate::driver::Driver;
 use crate::future::AsioFuture;
 use crate::win::*;
 
-use self::utils::DataExchange;
+use self::utils::{DataExchange, Token};
 use self::worker::Worker;
 
 const WM_CREATE_DRIVER : i32 = WM_APP;
@@ -43,10 +43,6 @@ enum Method {
 	CreateBuffers { channels: Vec<dto::ChannelId>, buffer_size: c_long, callbacks: *const sys::Callbacks},
 	Future { selector: sys::FutureSelector, opt: *mut c_void }
 }
-
-/// Identifies a hosted driver instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct Token(usize);
 
 /// A COM STA to create driver instances in, hosted by a dedicated thread driving a message pump.
 /// Provides a mechanism for funneling driver interactions through the apartment owner
