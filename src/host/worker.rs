@@ -156,30 +156,30 @@ impl Context {
 		let driver = &self.drivers[&token];
 
 		match method {
-			Method::Init { window_handle }          => unsafe { *ptr.cast() = driver.init              (window_handle) },
-			Method::Name                            => unsafe { *ptr.cast() = driver.name              (             ) },
-			Method::Version                         => unsafe { *ptr.cast() = driver.version           (             ) },
-			Method::LastError                       => unsafe { *ptr.cast() = driver.last_error        (             ) },
-			Method::Start                           => unsafe { *ptr.cast() = driver.start             (             ) },
-			Method::Stop                            => unsafe { *ptr.cast() = driver.stop              (             ) },
-			Method::ChannelCounts                   => unsafe { *ptr.cast() = driver.channel_counts    (             ) },
-			Method::Latencies                       => unsafe { *ptr.cast() = driver.latencies         (             ) },
-			Method::BufferSize                      => unsafe { *ptr.cast() = driver.buffer_size       (             ) },
-			Method::CanSampleRate { sample_rate }   => unsafe { *ptr.cast() = driver.can_sample_rate   (sample_rate  ) },
-			Method::GetSampleRate                   => unsafe { *ptr.cast() = driver.get_sample_rate   (             ) },
-			Method::SetSampleRate { sample_rate }   => unsafe { *ptr.cast() = driver.set_sample_rate   (sample_rate  ) },
-			Method::ClockSources                    => unsafe { *ptr.cast() = driver.clock_sources     (             ) },
-			Method::SetClockSource { clock_source } => unsafe { *ptr.cast() = driver.set_clock_source  (clock_source ) },
-			Method::SamplePosition                  => unsafe { *ptr.cast() = driver.sample_position   (             ) },
-			Method::ChannelInfo { channel_id }      => unsafe { *ptr.cast() = driver.channel_info      (channel_id   ) },
-			Method::DisposeBuffers                  => unsafe { *ptr.cast() = driver.dispose_buffers   (             ) },
-			Method::OpenControlPanel                => unsafe { *ptr.cast() = driver.open_control_panel(             ) },
-			Method::OutputReady                     => unsafe { *ptr.cast() = driver.output_ready      (             ) },
+			Method::Init { window_handle }          => unsafe { ptr::write(ptr.cast(), driver.init              (window_handle)) },
+			Method::Name                            => unsafe { ptr::write(ptr.cast(), driver.name              (             )) },
+			Method::Version                         => unsafe { ptr::write(ptr.cast(), driver.version           (             )) },
+			Method::LastError                       => unsafe { ptr::write(ptr.cast(), driver.last_error        (             )) },
+			Method::Start                           => unsafe { ptr::write(ptr.cast(), driver.start             (             )) },
+			Method::Stop                            => unsafe { ptr::write(ptr.cast(), driver.stop              (             )) },
+			Method::ChannelCounts                   => unsafe { ptr::write(ptr.cast(), driver.channel_counts    (             )) },
+			Method::Latencies                       => unsafe { ptr::write(ptr.cast(), driver.latencies         (             )) },
+			Method::BufferSize                      => unsafe { ptr::write(ptr.cast(), driver.buffer_size       (             )) },
+			Method::CanSampleRate { sample_rate }   => unsafe { ptr::write(ptr.cast(), driver.can_sample_rate   (sample_rate  )) },
+			Method::GetSampleRate                   => unsafe { ptr::write(ptr.cast(), driver.get_sample_rate   (             )) },
+			Method::SetSampleRate { sample_rate }   => unsafe { ptr::write(ptr.cast(), driver.set_sample_rate   (sample_rate  )) },
+			Method::ClockSources                    => unsafe { ptr::write(ptr.cast(), driver.clock_sources     (             )) },
+			Method::SetClockSource { clock_source } => unsafe { ptr::write(ptr.cast(), driver.set_clock_source  (clock_source )) },
+			Method::SamplePosition                  => unsafe { ptr::write(ptr.cast(), driver.sample_position   (             )) },
+			Method::ChannelInfo { channel_id }      => unsafe { ptr::write(ptr.cast(), driver.channel_info      (channel_id   )) },
+			Method::DisposeBuffers                  => unsafe { ptr::write(ptr.cast(), driver.dispose_buffers   (             )) },
+			Method::OpenControlPanel                => unsafe { ptr::write(ptr.cast(), driver.open_control_panel(             )) },
+			Method::OutputReady                     => unsafe { ptr::write(ptr.cast(), driver.output_ready      (             )) },
 			Method::CreateBuffers { channels, buffer_size, callbacks } => unsafe {
 				driver
 				.create_buffers(channels, buffer_size, callbacks)
 				.map(Iterator::collect::<Vec<_>>)
-				.pipe(|ret| *ptr.cast() = ret);
+				.pipe(|ret| ptr::write(ptr.cast(), ret));
 			},
 			Method::Future { selector, opt } => unsafe {
 				driver
@@ -187,7 +187,7 @@ impl Context {
 				.0
 				.future(selector, opt)
 				.to_result()
-				.pipe(|ret| *ptr.cast() = ret);
+				.pipe(|ret| ptr::write(ptr.cast(), ret));
 			},
 		}
 	}
