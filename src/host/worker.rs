@@ -114,7 +114,7 @@ impl Context {
 			SetWindowLongPtrW(
 				window_handle,
 				GWLP_USERDATA,
-				<*mut _>::expose_provenance(self).cast_signed()
+				<*mut _>::expose_provenance(self) as _ // i32 (instead of isize) on 32bit systems because wtf Microsoft
 			);
 		}
 	}
