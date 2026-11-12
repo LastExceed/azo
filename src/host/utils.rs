@@ -50,7 +50,7 @@ pub struct Token(pub usize);
 pub struct TokenGenerator(usize);
 
 impl TokenGenerator {
-	pub const fn new_token(&mut self) -> Token {
+	pub const fn next(&mut self) -> Token {
 		let token = Token(self.0);
 		self.0 += 1;
 		token

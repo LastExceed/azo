@@ -142,17 +142,19 @@ impl Context {
 	}
 	
 	fn register_driver(&mut self, driver: driver::SafeHandle) -> Token {
-		let token = self.token_generator.new_token();
+		let token = self.token_generator.next();
 		self.drivers.insert(token, driver);
 		token
 	}
 	
 	fn call_method(&self, w_param: WPARAM) {
-		// cannot use the [`DataExchange`] union here,
-		// as the `Response` type depends on the request value
-		let ptr = ptr::with_exposed_provenance_mut::<(_, _)>(w_param.0);
+		type Request = (Token, Method);
 
-		let (token, method) = unsafe { ptr.read() };
+		// cannot use the `DataExchange` union here,
+		// as the `Response` type depends on the request value
+		let ptr: *mut Request = ptr::with_exposed_provenance_mut(w_param.0);
+
+		let (token, method) = unsafe { ptr.read() }; // The request data sits inside a `ManuallyDrop`
 		let driver = &self.drivers[&token];
 
 		match method {
