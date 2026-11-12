@@ -122,8 +122,7 @@ impl Context {
 	fn get<'ctx>(window_handle: HWND) -> &'ctx mut Self {
 		unsafe {
 			GetWindowLongPtrW(window_handle, GWLP_USERDATA)
-			.cast_unsigned()
-			.pipe(ptr::with_exposed_provenance_mut::<Self>)
+			.pipe(|addr| ptr::with_exposed_provenance_mut::<Self>(addr as _)) // i32 (instead of isize) on 32bit systems because wtf Microsoft
 			.as_mut()
 			.expect("invalid GWLP_USERDATA")
 		}
