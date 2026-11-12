@@ -27,7 +27,7 @@ host = ["dep:oneshot"]
 undocumented = ["azo-sys/undocumented"]
 
 [dependencies]
-azo-sys = { path = "./azo-sys", version = "0.3.2" }
+azo-sys = { path = "./azo-sys", version = "0.4.0" }
 oneshot = { version = "0.2.1", features = ["std"], optional = true }
 tap = "1.0.1"
 windows-core = "0.100.0"
