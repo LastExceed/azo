@@ -21,7 +21,7 @@ For Rust bindings to the official [ASIO SDK by Steinberg](https://www.steinberg.
 ### Getting Started
 
 1. Discover drivers registered in the system via `driver::Metadata::enumerate()`
-2. Instanciate the driver(s) via `driver::SafeHandle::new()`
+2. Instanciate the driver(s) via `driver::SafeHandle::new()` (or `Host::create_driver()`)
 3. Initialize the driver instance via `.init()`
 4. ???
 5. Profit.
